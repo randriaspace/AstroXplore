@@ -18,6 +18,9 @@ interface GroupDao {
     @Query("DELETE FROM journal_clubs")
     suspend fun clearAll()
 
+    @Query("DELETE FROM journal_clubs WHERE id = :groupId")
+    suspend fun deleteGroup(groupId: String)
+
     @Query("SELECT * FROM journal_clubs WHERE isSynced = 0")
     suspend fun getUnsyncedGroups(): List<GroupEntity>
 }

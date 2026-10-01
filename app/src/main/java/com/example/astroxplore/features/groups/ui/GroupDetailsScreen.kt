@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -60,15 +61,18 @@ fun GroupDetailsScreen(
 
     var showEditSheet by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var showQrDialog by remember { mutableStateOf(false) }
     var showScheduleSheet by remember { mutableStateOf(false) }
     var showReviewSheet by remember { mutableStateOf(false) }
     var selectedBibcodeForSchedule by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
+    val inviteToken by viewModel.inviteToken.collectAsState()
 
     LaunchedEffect(groupId) {
         viewModel.loadGroupData(groupId)
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
 
     if (group == null && uiState !is GroupDetailsUiState.Loading) {
@@ -100,10 +104,10 @@ fun GroupDetailsScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showQrDialog = true }) {
-                        Icon(Icons.Default.QrCode, contentDescription = "QR Code")
-                    }
                     if (currentUserRole == "admin" || group?.ownerId == currentUserId) {
+                        IconButton(onClick = viewModel::createInvite) {
+                            Icon(Icons.Default.QrCode, contentDescription = "Create club invite")
+                        }
                         IconButton(onClick = { showEditSheet = true }) {
                             Icon(Icons.Default.Edit, contentDescription = "Edit Club")
                         }
@@ -191,11 +195,11 @@ fun GroupDetailsScreen(
         }
     }
 
-    if (showQrDialog && group != null) {
-        QrCodeDialog(
-            displayId = group!!.displayId,
+    if (inviteToken != null && group != null) {
+        GroupInviteDialog(
+            inviteToken = inviteToken!!,
             name = group!!.name,
-            onDismiss = { showQrDialog = false }
+            onDismiss = viewModel::dismissInvite
         )
     }
 
@@ -236,17 +240,17 @@ fun GroupDetailsScreen(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Dissolve Journal Club?") },
-            text = { Text("This action cannot be undone. All shared papers and discussions will be permanently deleted.") },
+            title = { Text("Archive Journal Club?") },
+            text = { Text("The club will leave the active club list. Existing member data remains stored, and no new members can join.") },
             confirmButton = {
                 Button(
                     onClick = { 
-                        viewModel.deleteGroup() 
+                        viewModel.archiveGroup()
                         showDeleteDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Delete Permanently")
+                    Text("Archive Club")
                 }
             },
             dismissButton = {
@@ -752,12 +756,12 @@ fun MemberRosterItem(
 }
 
 @Composable
-fun QrCodeDialog(
-    displayId: String,
+fun GroupInviteDialog(
+    inviteToken: String,
     name: String,
     onDismiss: () -> Unit
 ) {
-    val qrBitmap = remember(displayId) { QrCodeUtils.generateQrCode(displayId) }
+    val qrBitmap = remember(inviteToken) { QrCodeUtils.generateQrCode(inviteToken) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -767,13 +771,24 @@ fun QrCodeDialog(
                 if (qrBitmap != null) {
                     Image(
                         bitmap = qrBitmap.asImageBitmap(),
-                        contentDescription = "Club QR Code",
+                        contentDescription = "One-use club invitation QR code",
                         modifier = Modifier.size(200.dp)
                     )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Club ID: $displayId", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                Text("Share this ID or QR code with colleagues to invite them.", textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall)
+                SelectionContainer {
+                    Text(
+                        text = inviteToken.chunked(8).joinToString(" "),
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelMedium,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                Text(
+                    "Share this single-use invite within 7 days. It grants membership in this club.",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         },
         confirmButton = {

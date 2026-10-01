@@ -46,8 +46,14 @@ fun GroupsScreen(
             if (success) {
                 snackbarHostState.showSnackbar("Successfully joined the club!")
             } else {
-                snackbarHostState.showSnackbar("Club not found. Please check the ID.")
+                snackbarHostState.showSnackbar("Couldn't join. Check the public club code or invite token.")
             }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.messages.collectLatest { message ->
+            snackbarHostState.showSnackbar(message)
         }
     }
 
@@ -273,8 +279,8 @@ fun JoinGroupDialog(
             OutlinedTextField(
                 value = id,
                 onValueChange = { id = it.uppercase() },
-                label = { Text("Enter Club ID") },
-                placeholder = { Text("e.g. A1B2C3D4") },
+                label = { Text("Public club code or private invite token") },
+                placeholder = { Text("8-character code or 64-character token") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.medium,
                 singleLine = true

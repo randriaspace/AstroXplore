@@ -7,6 +7,7 @@ import com.example.astroxplore.features.groups.data.GroupRepository
 import com.example.astroxplore.features.groups.model.GroupModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -28,6 +29,9 @@ class GroupsViewModel @Inject constructor(
 
     private val _joinStatus = MutableSharedFlow<Boolean>()
     val joinStatus = _joinStatus.asSharedFlow()
+
+    private val _messages = MutableSharedFlow<String>()
+    val messages = _messages.asSharedFlow()
 
     // Offline-First: Reactively observe local database
     val groups: StateFlow<List<GroupModel>> = groupRepository.getLocalGroups()
@@ -59,13 +63,19 @@ class GroupsViewModel @Inject constructor(
 
     fun createGroup(name: String, description: String?, focusArea: String?) {
         viewModelScope.launch {
-            groupRepository.createGroup(name, description, focusArea)
+            try {
+                groupRepository.createGroup(name, description, focusArea)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _messages.emit("Couldn't create the club. Check your connection and try again.")
+            }
         }
     }
 
     fun joinGroup(displayId: String) {
         viewModelScope.launch {
-            val success = groupRepository.joinGroupByDisplayId(displayId)
+            val success = groupRepository.joinGroup(displayId)
             _joinStatus.emit(success)
         }
     }

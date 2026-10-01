@@ -1,22 +1,25 @@
 package com.example.astroxplore.features.groups.data
 
-import android.util.Log
 import com.example.astroxplore.core.database.dao.GroupDao
 import com.example.astroxplore.core.database.dao.GroupPaperDao
 import com.example.astroxplore.core.database.entity.GroupEntity
 import com.example.astroxplore.core.database.entity.toEntity
-import com.example.astroxplore.core.network.NetworkConnectivityObserver
 import com.example.astroxplore.features.groups.model.*
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
-import kotlinx.coroutines.CoroutineScope
+import io.github.jan.supabase.postgrest.rpc
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.time.LocalDateTime
 import java.util.UUID
 import javax.inject.Inject
@@ -26,20 +29,8 @@ import javax.inject.Singleton
 class GroupRepository @Inject constructor(
     private val supabaseClient: SupabaseClient,
     private val groupDao: GroupDao,
-    private val groupPaperDao: GroupPaperDao,
-    private val networkConnectivityObserver: NetworkConnectivityObserver
+    private val groupPaperDao: GroupPaperDao
 ) {
-    private val repositoryScope = CoroutineScope(Dispatchers.IO)
-
-    init {
-        repositoryScope.launch {
-            networkConnectivityObserver.isConnected.collect { isConnected ->
-                if (isConnected) {
-                    syncGroups()
-                }
-            }
-        }
-    }
     /**
      * Reactively observe groups from the local database (Offline-First)
      */
@@ -57,45 +48,9 @@ class GroupRepository @Inject constructor(
 
     suspend fun syncGroups() = withContext(Dispatchers.IO) {
         val userId = supabaseClient.auth.currentUserOrNull()?.id 
-        if (userId == null) {
-            Log.e("GroupRepository", "syncGroups: currentUserOrNull() is null! User not authenticated.")
-            return@withContext
-        }
+        if (userId == null) return@withContext
         try {
-            // 0. Push any pending local unsynced groups to Supabase
-            val unsyncedGroups = groupDao.getUnsyncedGroups()
-            for (localGroup in unsyncedGroups) {
-                try {
-                    val supabaseGroup = mapOf(
-                        "id" to localGroup.id,
-                        "display_id" to localGroup.displayId,
-                        "name" to localGroup.name,
-                        "description" to localGroup.description,
-                        "owner_id" to localGroup.ownerId,
-                        "focus_area" to localGroup.focusArea,
-                        "member_count" to localGroup.memberCount
-                    )
-                    val insertedGroup = supabaseClient.postgrest["groups"]
-                        .insert(supabaseGroup) { select() }
-                        .decodeSingle<GroupModel>()
-
-                    val initialMember = GroupMemberModel(
-                        groupId = insertedGroup.id,
-                        userId = userId,
-                        role = "admin"
-                    )
-                    try {
-                        supabaseClient.postgrest["group_members"].insert(initialMember)
-                    } catch (_: Exception) {}
-
-                    // Remove local temporary row and insert synced row
-                    groupDao.insertGroup(insertedGroup.toEntity(isSynced = true))
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-
-            // 1. Fetch group IDs where the user is a member
+            // Membership rows are the authoritative source for this user's club list.
             val memberships = supabaseClient.postgrest["group_members"]
                 .select(columns = Columns.ALL) {
                     filter { eq("user_id", userId) }
@@ -108,8 +63,9 @@ class GroupRepository @Inject constructor(
                 // 2. Fetch the actual group details for those IDs
                 val remoteGroups = supabaseClient.postgrest["groups"]
                     .select(columns = Columns.ALL) {
-                        filter { 
+                        filter {
                             isIn("id", groupIds)
+                            eq("status", "active")
                         }
                     }
                     .decodeList<GroupModel>()
@@ -141,109 +97,90 @@ class GroupRepository @Inject constructor(
         }
     }
 
-    suspend fun createGroup(name: String, description: String?, focusArea: String?) = withContext(Dispatchers.IO) {
-        val userId = supabaseClient.auth.currentUserOrNull()?.id 
-        if (userId == null) {
-            Log.e("GroupRepository", "createGroup: currentUserOrNull() is null! User not authenticated.")
-            return@withContext
-        }
-        
-        // Short human-friendly ID
-        val displayId = UUID.randomUUID().toString().take(8).uppercase()
-        val localId = UUID.randomUUID().toString()
-        
-        val localGroup = GroupEntity(
-            id = localId,
-            displayId = displayId,
-            name = name,
-            description = description,
-            ownerId = userId,
-            focusArea = focusArea,
-            memberCount = 1,
-            createdAt = LocalDateTime.now().toString(),
-            isSynced = false
-        )
-        groupDao.insertGroup(localGroup)
-
-        try {
-            val supabaseGroup = mapOf(
-                "display_id" to displayId,
-                "name" to name,
-                "description" to description,
-                "owner_id" to userId,
-                "focus_area" to focusArea,
-                "member_count" to 1
-            )
-            val insertedGroup = supabaseClient.postgrest["groups"]
-                .insert(supabaseGroup) { select() }
-                .decodeSingle<GroupModel>()
-            
-            // Also create initial membership for the owner
-            val initialMember = GroupMemberModel(
-                groupId = insertedGroup.id,
-                userId = userId,
-                role = "admin"
-            )
-            supabaseClient.postgrest["group_members"].insert(initialMember)
-            
-            // Update local
-            groupDao.insertGroup(insertedGroup.toEntity(isSynced = true))
-        } catch (e: Exception) {
-            e.printStackTrace()
-            // Remains unsynced
-        }
+    suspend fun createGroup(
+        name: String,
+        description: String?,
+        focusArea: String?
+    ): GroupModel = withContext(Dispatchers.IO) {
+        val rows = supabaseClient.postgrest.rpc(
+            function = "create_group",
+            parameters = buildJsonObject {
+                put("p_name", name.trim())
+                put("p_description", description?.let(::JsonPrimitive) ?: JsonNull)
+                put("p_focus_area", focusArea?.let(::JsonPrimitive) ?: JsonNull)
+                put("p_visibility", "private")
+            }
+        ).decodeList<GroupModel>()
+        val group = rows.singleOrNull() ?: error("The server did not return the created club")
+        groupDao.insertGroup(group.toEntity(isSynced = true))
+        group
     }
 
-    suspend fun joinGroupByDisplayId(displayId: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun joinGroup(inviteOrDisplayId: String): Boolean = withContext(Dispatchers.IO) {
         val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return@withContext false
+        val input = inviteOrDisplayId.filterNot(Char::isWhitespace)
         try {
-            val group = supabaseClient.postgrest["groups"]
-                .select(columns = Columns.ALL) {
-                    filter { eq("display_id", displayId.uppercase()) }
-                }
-                .decodeSingle<GroupModel>()
-            
-            val membership = GroupMemberModel(
-                groupId = group.id,
-                userId = userId,
-                role = "member"
-            )
-            supabaseClient.postgrest["group_members"].insert(membership)
-            
-            // Save locally
+            val group = if (input.matches(Regex("^[0-9a-fA-F]{64}$"))) {
+                val groupId = supabaseClient.postgrest.rpc(
+                    function = "accept_group_invite",
+                    parameters = buildJsonObject { put("p_token", input) }
+                ).decodeSingle<String>()
+                fetchGroupById(groupId)
+            } else {
+                val group = supabaseClient.postgrest["groups"]
+                    .select(columns = Columns.ALL) {
+                        filter {
+                            eq("display_id", input.uppercase())
+                            eq("visibility", "public")
+                            eq("status", "active")
+                        }
+                    }
+                    .decodeSingle<GroupModel>()
+                supabaseClient.postgrest["group_members"].insert(
+                    mapOf("group_id" to group.id, "user_id" to userId, "role" to "member")
+                )
+                group
+            }
             groupDao.insertGroup(group.toEntity(isSynced = true))
-            return@withContext true
-        } catch (e: Exception) {
-            return@withContext false
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            false
         }
     }
+
+    suspend fun createGroupInvite(groupId: String): String = withContext(Dispatchers.IO) {
+        supabaseClient.postgrest.rpc(
+            function = "create_group_invite",
+            parameters = buildJsonObject {
+                put("p_group_id", groupId)
+                put("p_max_uses", 1)
+            }
+        ).decodeSingle<String>()
+    }
+
+    private suspend fun fetchGroupById(groupId: String): GroupModel =
+        supabaseClient.postgrest["groups"]
+            .select(columns = Columns.ALL) { filter { eq("id", groupId) } }
+            .decodeSingle()
 
     suspend fun leaveGroup(groupId: String) = withContext(Dispatchers.IO) {
-        val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return@withContext
-        try {
-            supabaseClient.postgrest["group_members"].delete {
-                filter {
-                    eq("group_id", groupId)
-                    eq("user_id", userId)
-                }
-            }
-            groupDao.clearAll()
-            syncGroups()
-        } catch (e: Exception) {
-            // Log error
-        }
+        supabaseClient.postgrest.rpc<JsonElement>(
+            function = "leave_group",
+            parameters = buildJsonObject { put("p_group_id", groupId) }
+        )
+        groupDao.deleteGroup(groupId)
+        groupPaperDao.deleteGroupPapers(groupId)
     }
 
-    suspend fun deleteGroup(groupId: String) = withContext(Dispatchers.IO) {
-        try {
-            supabaseClient.postgrest["groups"].delete {
-                filter { eq("id", groupId) }
-            }
-            groupDao.clearAll()
-            syncGroups()
-        } catch (e: Exception) {
-            // Log error
-        }
+    suspend fun archiveGroup(groupId: String) = withContext(Dispatchers.IO) {
+        supabaseClient.postgrest.rpc<JsonElement>(
+            function = "archive_group",
+            parameters = buildJsonObject { put("p_group_id", groupId) }
+        )
+        groupDao.deleteGroup(groupId)
+        groupPaperDao.deleteGroupPapers(groupId)
     }
 
     suspend fun updateGroup(groupId: String, name: String, description: String?, focusArea: String?) = withContext(Dispatchers.IO) {
@@ -357,17 +294,15 @@ class GroupRepository @Inject constructor(
 
     suspend fun schedulePresentation(groupId: String, bibcode: String, scheduledAt: LocalDateTime) = withContext(Dispatchers.IO) {
         val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return@withContext
-        val presentation = PresentationModel(
-            groupId = groupId,
-            bibcode = bibcode,
-            presenterId = userId,
-            scheduledAt = scheduledAt.toString()
+        supabaseClient.postgrest["group_presentations"].insert(
+            mapOf(
+                "group_id" to groupId,
+                "bibcode" to bibcode,
+                "presenter_id" to userId,
+                "scheduled_at" to scheduledAt.toString(),
+                "time_zone" to java.time.ZoneId.systemDefault().id
+            )
         )
-        try {
-            supabaseClient.postgrest["group_presentations"].insert(presentation)
-        } catch (e: Exception) {
-            // Log error
-        }
     }
 
     suspend fun getGroupPresentations(groupId: String): List<PresentationModel> = withContext(Dispatchers.IO) {
@@ -397,43 +332,38 @@ class GroupRepository @Inject constructor(
     }
 
     suspend fun kickMember(groupId: String, targetUserId: String) = withContext(Dispatchers.IO) {
-        try {
-            supabaseClient.postgrest["group_members"].delete {
-                filter {
-                    eq("group_id", groupId)
-                    eq("user_id", targetUserId)
-                }
+        supabaseClient.postgrest.rpc<JsonElement>(
+            function = "remove_group_member",
+            parameters = buildJsonObject {
+                put("p_group_id", groupId)
+                put("p_user_id", targetUserId)
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        )
     }
 
     suspend fun updateMemberRole(groupId: String, targetUserId: String, newRole: String) = withContext(Dispatchers.IO) {
-        try {
-            supabaseClient.postgrest["group_members"].update(mapOf("role" to newRole)) {
-                filter {
-                    eq("group_id", groupId)
-                    eq("user_id", targetUserId)
-                }
+        supabaseClient.postgrest.rpc<JsonElement>(
+            function = "set_group_member_role",
+            parameters = buildJsonObject {
+                put("p_group_id", groupId)
+                put("p_user_id", targetUserId)
+                put("p_new_role", newRole)
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        )
     }
 
     suspend fun addSessionReview(groupId: String, bibcode: String, notes: String, rating: Int) = withContext(Dispatchers.IO) {
         val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return@withContext
-        val review = SessionReviewModel(
-            groupId = groupId,
-            bibcode = bibcode,
-            reviewerId = userId,
-            notes = notes,
-            rating = rating,
-            createdAt = LocalDateTime.now().toString()
-        )
         try {
-            supabaseClient.postgrest["group_session_reviews"].insert(review)
+            supabaseClient.postgrest["group_session_reviews"].insert(
+                mapOf(
+                    "group_id" to groupId,
+                    "bibcode" to bibcode,
+                    "reviewer_id" to userId,
+                    "notes" to notes,
+                    "rating" to rating
+                )
+            )
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -452,17 +382,10 @@ class GroupRepository @Inject constructor(
     }
 
     suspend fun checkInSession(presentationId: String) = withContext(Dispatchers.IO) {
-        val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return@withContext
-        val attendance = SessionAttendanceModel(
-            presentationId = presentationId,
-            userId = userId,
-            checkedInAt = LocalDateTime.now().toString()
+        supabaseClient.postgrest.rpc<JsonElement>(
+            function = "check_in_session",
+            parameters = buildJsonObject { put("p_presentation_id", presentationId) }
         )
-        try {
-            supabaseClient.postgrest["group_session_attendance"].insert(attendance)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
     }
 
     suspend fun getSessionAttendance(presentationId: String): List<SessionAttendanceModel> = withContext(Dispatchers.IO) {

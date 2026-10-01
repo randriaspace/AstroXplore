@@ -18,6 +18,9 @@ interface GroupPaperDao {
     @Query("DELETE FROM group_papers WHERE groupId = :groupId AND bibcode = :bibcode")
     suspend fun deleteGroupPaper(groupId: String, bibcode: String)
 
+    @Query("DELETE FROM group_papers WHERE groupId = :groupId")
+    suspend fun deleteGroupPapers(groupId: String)
+
     @Query("SELECT * FROM group_papers WHERE isSynced = 0")
     suspend fun getUnsyncedGroupPapers(): List<GroupPaperEntity>
 }

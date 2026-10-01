@@ -10,6 +10,7 @@ import com.example.astroxplore.features.groups.data.GroupRepository
 import com.example.astroxplore.features.groups.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import javax.inject.Inject
@@ -46,6 +47,12 @@ class GroupDetailsViewModel @Inject constructor(
 
     private val _currentUserRole = MutableStateFlow("member")
     val currentUserRole: StateFlow<String> = _currentUserRole.asStateFlow()
+
+    private val _inviteToken = MutableStateFlow<String?>(null)
+    val inviteToken: StateFlow<String?> = _inviteToken.asStateFlow()
+
+    private val _messages = MutableSharedFlow<String>()
+    val messages = _messages.asSharedFlow()
 
     val currentUserId get() = authRepository.currentUser?.id
 
@@ -102,6 +109,23 @@ class GroupDetailsViewModel @Inject constructor(
         viewModelScope.launch {
             _kpiStats.value = groupRepository.getGroupKpis(groupId)
         }
+    }
+
+    fun createInvite() {
+        val groupId = _currentGroup.value?.id ?: return
+        viewModelScope.launch {
+            try {
+                _inviteToken.value = groupRepository.createGroupInvite(groupId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _messages.emit("Couldn't create an invite. Check your connection and permissions.")
+            }
+        }
+    }
+
+    fun dismissInvite() {
+        _inviteToken.value = null
     }
 
     fun kickMember(targetUserId: String) {
@@ -198,10 +222,10 @@ class GroupDetailsViewModel @Inject constructor(
         }
     }
 
-    fun deleteGroup() {
+    fun archiveGroup() {
         val groupId = _currentGroup.value?.id ?: return
         viewModelScope.launch {
-            groupRepository.deleteGroup(groupId)
+            groupRepository.archiveGroup(groupId)
         }
     }
 
