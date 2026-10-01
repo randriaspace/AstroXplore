@@ -22,9 +22,7 @@ class SignupViewModel @Inject constructor(
         email: String,
         password: String,
         firstName: String,
-        lastName: String,
-        institution: String?,
-        orcidId: String?
+        lastName: String
     ) {
         viewModelScope.launch {
             _uiState.value = SignupUiState.Loading
@@ -33,12 +31,11 @@ class SignupViewModel @Inject constructor(
                     email, 
                     password, 
                     firstName, 
-                    lastName,
-                    institution,
-                    orcidId
+                    lastName
                 )
                 _uiState.value = SignupUiState.Success(needsConfirmation)
             } catch (e: Exception) {
+                e.printStackTrace()
                 _uiState.value = SignupUiState.Error(ErrorMapper.mapToMessage(e))
             }
         }

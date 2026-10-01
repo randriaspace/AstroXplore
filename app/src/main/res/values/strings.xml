@@ -64,4 +64,5 @@
     <string name="error_unknown">Something went wrong. Please try again later.</string>
     <string name="error_session_expired">Session expired. Please log in again.</string>
     <string name="error_database">Failed to sync your data. Please try again.</string>
+    <string name="error_rate_limit" translatable="false">Email rate limit exceeded. Please wait a few minutes or disable email confirmation in Supabase.</string>
 </resources>

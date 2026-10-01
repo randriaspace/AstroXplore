@@ -31,6 +31,7 @@ fun EditProfileScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Edit Profile", fontWeight = FontWeight.Bold) },
+                windowInsets = WindowInsets(0.dp),
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")

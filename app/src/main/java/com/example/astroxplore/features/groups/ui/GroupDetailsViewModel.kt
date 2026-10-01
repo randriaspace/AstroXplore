@@ -2,18 +2,14 @@ package com.example.astroxplore.features.groups.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.astroxplore.core.network.NetworkConnectivityObserver
 import com.example.astroxplore.features.auth.data.AuthRepository
 import com.example.astroxplore.features.feed.data.PaperRepository
 import com.example.astroxplore.features.feed.model.PaperModel
 import com.example.astroxplore.features.groups.data.GroupRepository
-import com.example.astroxplore.features.groups.model.GroupModel
-import com.example.astroxplore.features.groups.model.GroupPaperModel
-import com.example.astroxplore.features.groups.model.PresentationModel
+import com.example.astroxplore.features.groups.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import javax.inject.Inject
@@ -22,14 +18,34 @@ import javax.inject.Inject
 class GroupDetailsViewModel @Inject constructor(
     private val groupRepository: GroupRepository,
     private val paperRepository: PaperRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    networkConnectivityObserver: NetworkConnectivityObserver
 ) : ViewModel() {
+
+    val isOnline: StateFlow<Boolean> = networkConnectivityObserver.isConnected
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
 
     private val _uiState = MutableStateFlow<GroupDetailsUiState>(GroupDetailsUiState.Loading)
     val uiState: StateFlow<GroupDetailsUiState> = _uiState.asStateFlow()
 
     private val _currentGroup = MutableStateFlow<GroupModel?>(null)
     val currentGroup = _currentGroup.asStateFlow()
+
+    private val _members = MutableStateFlow<List<GroupMemberModel>>(emptyList())
+    val members: StateFlow<List<GroupMemberModel>> = _members.asStateFlow()
+
+    private val _sessionReviews = MutableStateFlow<List<SessionReviewModel>>(emptyList())
+    val sessionReviews: StateFlow<List<SessionReviewModel>> = _sessionReviews.asStateFlow()
+
+    private val _kpiStats = MutableStateFlow<GroupKpiModel?>(null)
+    val kpiStats: StateFlow<GroupKpiModel?> = _kpiStats.asStateFlow()
+
+    private val _currentUserRole = MutableStateFlow("member")
+    val currentUserRole: StateFlow<String> = _currentUserRole.asStateFlow()
 
     val currentUserId get() = authRepository.currentUser?.id
 
@@ -41,6 +57,9 @@ class GroupDetailsViewModel @Inject constructor(
             groupRepository.getLocalGroups().collectLatest { groups ->
                 val group = groups.find { it.id == groupId }
                 _currentGroup.value = group
+                if (group != null && group.ownerId == currentUserId) {
+                    _currentUserRole.value = "admin"
+                }
             }
         }
 
@@ -54,6 +73,68 @@ class GroupDetailsViewModel @Inject constructor(
         // Background sync
         viewModelScope.launch {
             groupRepository.syncGroupPapers(groupId)
+            loadGroupMembers(groupId)
+            loadSessionReviews(groupId)
+            loadKpis(groupId)
+        }
+    }
+
+    fun loadGroupMembers(groupId: String) {
+        viewModelScope.launch {
+            val fetchedMembers = groupRepository.getGroupMembers(groupId)
+            _members.value = fetchedMembers
+            val myMembership = fetchedMembers.find { it.userId == currentUserId }
+            if (_currentGroup.value?.ownerId == currentUserId) {
+                _currentUserRole.value = "admin"
+            } else if (myMembership != null) {
+                _currentUserRole.value = myMembership.role
+            }
+        }
+    }
+
+    fun loadSessionReviews(groupId: String) {
+        viewModelScope.launch {
+            _sessionReviews.value = groupRepository.getSessionReviews(groupId)
+        }
+    }
+
+    fun loadKpis(groupId: String) {
+        viewModelScope.launch {
+            _kpiStats.value = groupRepository.getGroupKpis(groupId)
+        }
+    }
+
+    fun kickMember(targetUserId: String) {
+        val groupId = _currentGroup.value?.id ?: return
+        viewModelScope.launch {
+            groupRepository.kickMember(groupId, targetUserId)
+            loadGroupMembers(groupId)
+            loadKpis(groupId)
+        }
+    }
+
+    fun updateMemberRole(targetUserId: String, newRole: String) {
+        val groupId = _currentGroup.value?.id ?: return
+        viewModelScope.launch {
+            groupRepository.updateMemberRole(groupId, targetUserId, newRole)
+            loadGroupMembers(groupId)
+        }
+    }
+
+    fun addSessionReview(bibcode: String, notes: String, rating: Int) {
+        val groupId = _currentGroup.value?.id ?: return
+        viewModelScope.launch {
+            groupRepository.addSessionReview(groupId, bibcode, notes, rating)
+            loadSessionReviews(groupId)
+            loadKpis(groupId)
+        }
+    }
+
+    fun checkInSession(presentationId: String) {
+        val groupId = _currentGroup.value?.id ?: return
+        viewModelScope.launch {
+            groupRepository.checkInSession(presentationId)
+            loadKpis(groupId)
         }
     }
 
@@ -82,6 +163,7 @@ class GroupDetailsViewModel @Inject constructor(
     private fun refreshGroupContent(groupId: String) {
         viewModelScope.launch {
             groupRepository.syncGroupPapers(groupId)
+            loadKpis(groupId)
         }
     }
 

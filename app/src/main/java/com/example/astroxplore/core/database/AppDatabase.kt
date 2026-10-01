@@ -7,11 +7,13 @@ import com.example.astroxplore.core.database.dao.GroupDao
 import com.example.astroxplore.core.database.dao.GroupPaperDao
 import com.example.astroxplore.core.database.dao.KeywordDao
 import com.example.astroxplore.core.database.dao.ProfileDao
+import com.example.astroxplore.core.database.dao.PendingPaperDeletionDao
 import com.example.astroxplore.core.database.dao.SavedPaperDao
 import com.example.astroxplore.core.database.entity.FeedPaperEntity
 import com.example.astroxplore.core.database.entity.GroupEntity
 import com.example.astroxplore.core.database.entity.GroupPaperEntity
 import com.example.astroxplore.core.database.entity.KeywordEntity
+import com.example.astroxplore.core.database.entity.PendingPaperDeletionEntity
 import com.example.astroxplore.core.database.entity.ProfileEntity
 import com.example.astroxplore.core.database.entity.SavedPaperEntity
 import com.example.astroxplore.core.database.entity.UserPreferenceEntity
@@ -24,9 +26,10 @@ import com.example.astroxplore.core.database.entity.UserPreferenceEntity
         FeedPaperEntity::class,
         GroupEntity::class,
         ProfileEntity::class,
-        GroupPaperEntity::class
+        GroupPaperEntity::class,
+        PendingPaperDeletionEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -36,4 +39,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun groupDao(): GroupDao
     abstract fun profileDao(): ProfileDao
     abstract fun groupPaperDao(): GroupPaperDao
+    abstract fun pendingPaperDeletionDao(): PendingPaperDeletionDao
 }

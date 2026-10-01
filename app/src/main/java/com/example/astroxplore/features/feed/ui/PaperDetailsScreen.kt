@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -63,13 +64,26 @@ fun PaperDetailsScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Publication", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
+                title = { Text("Publication", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
+                windowInsets = WindowInsets(0.dp),
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
+                    if (uiState is PaperDetailsUiState.Success) {
+                        IconButton(onClick = {
+                            val paper = (uiState as PaperDetailsUiState.Success).paper
+                            viewModel.toggleSave(paper)
+                        }) {
+                            Icon(
+                                imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                                contentDescription = if (isSaved) "Remove from library" else "Save to library",
+                                tint = if (isSaved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
                     IconButton(onClick = {
                         val sendIntent: Intent = Intent().apply {
                             action = Intent.ACTION_SEND
@@ -82,21 +96,24 @@ fun PaperDetailsScreen(
                         Icon(Icons.Default.Share, contentDescription = "Share")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
             )
         },
         bottomBar = {
             if (uiState is PaperDetailsUiState.Success) {
                 val paper = (uiState as PaperDetailsUiState.Success).paper
                 Surface(
-                    tonalElevation = 8.dp,
-                    shadowElevation = 12.dp
+                    tonalElevation = 0.dp,
+                    color = MaterialTheme.colorScheme.background
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .navigationBarsPadding()
-                            .padding(16.dp),
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Button(
@@ -105,24 +122,29 @@ fun PaperDetailsScreen(
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                                 context.startActivity(intent)
                             },
-                            modifier = Modifier.weight(1f).height(56.dp),
-                            shape = MaterialTheme.shapes.large
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = MaterialTheme.shapes.medium
                         ) {
                             Icon(Icons.AutoMirrored.Outlined.Launch, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Read Full Paper", fontWeight = FontWeight.Bold)
+                            Text("Read PDF", fontWeight = FontWeight.SemiBold)
                         }
-                        
-                        FilledTonalIconButton(
-                            onClick = { viewModel.toggleSave(paper) },
-                            modifier = Modifier.size(56.dp),
-                            shape = MaterialTheme.shapes.large
+
+                        OutlinedButton(
+                            onClick = {
+                                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_SUBJECT, "BibTeX: ${paper.title}")
+                                    putExtra(Intent.EXTRA_TEXT, paper.toBibTeX())
+                                }
+                                context.startActivity(Intent.createChooser(sendIntent, "Export BibTeX"))
+                            },
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = MaterialTheme.shapes.medium
                         ) {
-                            Icon(
-                                imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
-                                contentDescription = "Save",
-                                tint = if (isSaved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Icon(Icons.Outlined.FormatQuote, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Export BibTeX", fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -139,8 +161,8 @@ fun PaperDetailsScreen(
                         paper = state.paper,
                         onCiteClick = {
                             scope.launch {
-                                clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bibcode", state.paper.bibcode)))
-                                snackbarHostState.showSnackbar("Bibcode copied to clipboard")
+                                clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("BibTeX", state.paper.toBibTeX())))
+                                snackbarHostState.showSnackbar("BibTeX copied to clipboard")
                             }
                         },
                         onAddToGroupClick = {
@@ -172,6 +194,7 @@ fun PaperDetailsScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PaperDetailsContent(
     paper: PaperModel,
@@ -182,120 +205,154 @@ fun PaperDetailsContent(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp)
+            .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
-        // Category Badge
-        Surface(
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-            shape = MaterialTheme.shapes.small
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                shape = MaterialTheme.shapes.small
+            ) {
+                Text(
+                    text = paper.category.uppercase(),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             Text(
-                text = paper.category.uppercase(),
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 1.sp
+                text = paper.dateDisplay,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
             )
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
 
-        // Title
+        Spacer(modifier = Modifier.height(14.dp))
+
         AstroPaperTitleText(
             title = paper.title,
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontWeight = FontWeight.ExtraBold,
-                lineHeight = 36.sp,
-                letterSpacing = (-0.5).sp
+            maxLines = Int.MAX_VALUE,
+            style = MaterialTheme.typography.headlineSmall.copy(
+                fontWeight = FontWeight.Bold,
+                lineHeight = 32.sp
             )
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        if (paper.authors.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = paper.authors.joinToString(", "),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
 
-        // Quick Actions Row
+        Spacer(modifier = Modifier.height(16.dp))
+
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            MetadataBadge(
+                label = "CITATIONS",
+                value = paper.citationCount.toString()
+            )
+            paper.arxivId?.let { arxivId ->
+                MetadataBadge(
+                    label = "ARXIV ID",
+                    value = arxivId
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             OutlinedButton(
                 onClick = onCiteClick,
                 modifier = Modifier.weight(1f),
                 shape = MaterialTheme.shapes.medium
             ) {
-                Icon(Icons.Outlined.FormatQuote, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Cite")
+                Text("Copy BibTeX", maxLines = 1)
             }
-            OutlinedButton(
+            FilledTonalButton(
                 onClick = onAddToGroupClick,
                 modifier = Modifier.weight(1f),
                 shape = MaterialTheme.shapes.medium
             ) {
                 Icon(Icons.Outlined.Groups, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Group")
+                Text("Add to group", maxLines = 1)
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // Authors
-        Text(
-            text = "AUTHORS",
-            style = MaterialTheme.typography.labelLarge.copy(letterSpacing = 1.sp),
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Black
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = paper.authors.joinToString(", "),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.Medium
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // Abstract
+        Spacer(modifier = Modifier.height(20.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Text(
             text = "ABSTRACT",
-            style = MaterialTheme.typography.labelLarge.copy(letterSpacing = 1.sp),
+            modifier = Modifier.padding(top = 18.dp),
+            style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Black
+            fontWeight = FontWeight.Bold
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         AstroAbstractView(
             rawAbstract = paper.abstractText,
             isExpanded = true
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // Metadata
+        Spacer(modifier = Modifier.height(20.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Text(
-            text = "METADATA",
-            style = MaterialTheme.typography.labelLarge.copy(letterSpacing = 1.sp),
+            text = "PUBLICATION DETAILS",
+            modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+            style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Black
+            fontWeight = FontWeight.Bold
         )
-        Spacer(modifier = Modifier.height(12.dp))
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
-            shape = MaterialTheme.shapes.large
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                MetadataRow("Published", paper.dateDisplay)
-                MetadataRow("Bibcode", paper.bibcode)
-                MetadataRow("Citations", paper.citationCount.toString())
-                if (paper.arxivId != null) {
-                    MetadataRow("arXiv ID", paper.arxivId!!)
-                }
-            }
-        }
+        MetadataRow("Published", paper.dateDisplay)
+        MetadataRow("Bibcode", paper.bibcode)
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+}
 
-        Spacer(modifier = Modifier.height(120.dp)) // Space for bottom bar
+@Composable
+private fun MetadataBadge(
+    label: String,
+    value: String
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
@@ -305,7 +362,32 @@ fun MetadataRow(label: String, value: String) {
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+        Text(
+            label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            value,
+            modifier = Modifier.weight(1.4f),
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.End
+        )
     }
+}
+
+private fun PaperModel.toBibTeX(): String = buildString {
+    append("@ARTICLE{").append(bibcode).append(",\n")
+    if (authors.isNotEmpty()) {
+        append("  author = {").append(authors.joinToString(" and ")).append("},\n")
+    }
+    append("  title = {").append(title).append("},\n")
+    rawPubDate?.take(4)?.toIntOrNull()?.let { year ->
+        append("  year = {").append(year).append("},\n")
+    }
+    append("  bibcode = {").append(bibcode).append("}\n}")
 }

@@ -3,6 +3,7 @@ package com.example.astroxplore.features.search.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.astroxplore.core.network.NasaAdsQueryBuilder
+import com.example.astroxplore.core.network.NetworkConnectivityObserver
 import com.example.astroxplore.core.util.ErrorMapper
 import com.example.astroxplore.features.feed.data.PaperRepository
 import com.example.astroxplore.features.feed.model.PaperModel
@@ -65,8 +66,16 @@ data class SearchFilter(
 class ExploreViewModel @Inject constructor(
     private val paperRepository: PaperRepository,
     private val libraryRepository: LibraryRepository,
-    private val profileRepository: ProfileRepository
+    private val profileRepository: ProfileRepository,
+    networkConnectivityObserver: NetworkConnectivityObserver
 ) : ViewModel() {
+
+    val isOnline: StateFlow<Boolean> = networkConnectivityObserver.isConnected
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
 
     private val _uiState = MutableStateFlow<ExploreUiState>(ExploreUiState.Idle)
     val uiState = _uiState.asStateFlow()

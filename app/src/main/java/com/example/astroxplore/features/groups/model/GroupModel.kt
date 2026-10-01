@@ -44,3 +44,31 @@ data class GroupMemberModel(
     @SerialName("role") val role: String = "member", // admin, moderator, member
     @SerialName("joined_at") val joinedAt: String? = null
 )
+
+@Serializable
+data class SessionReviewModel(
+    @SerialName("id") val id: String? = null,
+    @SerialName("group_id") val groupId: String,
+    @SerialName("bibcode") val bibcode: String,
+    @SerialName("reviewer_id") val reviewerId: String,
+    @SerialName("notes") val notes: String,
+    @SerialName("rating") val rating: Int = 5,
+    @SerialName("created_at") val createdAt: String? = null
+)
+
+@Serializable
+data class SessionAttendanceModel(
+    @SerialName("id") val id: String? = null,
+    @SerialName("presentation_id") val presentationId: String,
+    @SerialName("user_id") val userId: String,
+    @SerialName("checked_in_at") val checkedInAt: String? = null
+)
+
+@Serializable
+data class GroupKpiModel(
+    val totalPapers: Int = 0,
+    val totalVotes: Int = 0,
+    val totalPresentations: Int = 0,
+    val totalMembers: Int = 1,
+    val totalReviews: Int = 0
+)

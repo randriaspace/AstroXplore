@@ -1,51 +1,126 @@
-# Implementation Plan - Modern Android Splash Screen API
+# Implementation Plan - Feed Screen Refresh & Header Visibility
 
-This plan migrates the app from a custom Compose-based splash screen to the official **Android 12+ Splash Screen API** using `androidx.core:splashscreen`. This provides a smoother, native launch experience and reduces perceived app startup time.
+## Goal
+Improve the Feed screen experience by:
+1. Making the Feed screen feel fresh when opened (always show the header with welcoming message, notification bar, and search bar)
+2. Implementing a "quick refresh" experience with skeleton loading indicators
+3. Ensuring the UI remains responsive and polished
 
 ## User Review Required
 
 > [!IMPORTANT]
-> **Asset Requirements**: To complete this migration, I need the following from your Illustrator design:
-> 1. **Foreground Icon (SVG)**: A 108dp x 108dp vector. Ensure the main logo is centered within a **72dp diameter safe zone**.
-> 2. **Background Color**: The Hex code (e.g., `#0F172A`) you want for the splash background.
+> **User Feedback**: The user wants the Feed screen to feel fresh when opened, with the header (Welcome message, notification bar, search bar) always visible at the top. They also want a smooth loading experience that doesn't feel like the screen is scrolling or jumping around.
 
 ## Proposed Changes
 
-### Core: Infrastructure
+### 1. Header Visibility Fix
+- **Problem**: The header sometimes disappears when scrolling or loading.
+- **Solution**: Implement a more robust scroll detection and header visibility logic.
+- **Implementation**: Modify `FeedScreen.kt` to ensure the header is always visible when the screen first loads, and only hides when the user scrolls down.
 
-#### [MODIFY] [libs.versions.toml](file:///D:/Apps_Softwares/AstroXplore/gradle/libs.versions.toml)
-- Add `androidx-core-splashscreen = "1.0.1"` (or latest).
+### 2. Offline-First Feed with Skeleton Loading
+- **Problem**: Users see a blank or loading state when offline.
+- **Solution**: Implement a skeleton loader that shows when offline, and only shows actual content when online or cached data is available.
 
-#### [MODIFY] [build.gradle.kts (app)](file:///D:/Apps_Softwares/AstroXplore/app/build.gradle.kts)
-- Include the splashscreen library dependency.
+### 3. UI/UX Improvements
+- **Smooth Transitions**: Ensure all UI elements animate smoothly.
+- **Consistent Spacing**: Maintain consistent padding and spacing throughout the feed.
+- **Clear Feedback**: Show loading skeletons during refreshes and loading states.
 
----
+### Detailed Task Breakdown
 
-### UI & Theming
+### Phase 1: Database & Network Setup (Already Completed)
+- ✅ Database schema created (Groups, Group Papers, etc.)
+- ✅ Network connectivity monitoring implemented (NetworkConnectivityObserver)
+- **Pending**: Ensure feed data is cached locally for offline use
 
-#### [MODIFY] [themes.xml](file:///D:/Apps_Softwares/AstroXplore/app/src/main/res/values/themes.xml)
-- Define `Theme.AstroXplore.Starting`:
-    - Set `windowSplashScreenBackground`.
-    - Set `windowSplashScreenAnimatedIcon`.
-    - Set `postSplashScreenTheme` to `Theme.AstroXplore`.
+### Phase 2: UI/UX Implementation (Current Phase)
 
-#### [MODIFY] [AndroidManifest.xml](file:///D:/Apps_Softwares/AstroXplore/app/src/main/AndroidManifest.xml)
-- Update `MainActivity` to use `android:theme="@style/Theme.AstroXplore.Starting"`.
+#### 2.1 Feed Screen Header Visibility
+- **Problem**: Header disappears when scrolling or loading
+- **Solution**: Implement a scroll-position-based header visibility check
+- **Files to modify**: `FeedScreen.kt`
 
----
+#### 2.2. Feed Content Loading
+- **Problem**: Feed content loads slowly, causing perceived lag
+- **Solution**: Implement skeleton loading states that appear when data is loading
+- **Files to modify**: `FeedViewModel.kt`, `FeedScreen.kt`
 
-### Logic & Cleanup
+#### 2.3. Feed Loading Logic
+- **Problem**: Feed content loads too quickly or inconsistently
+- **Solution**: Add explicit loading state management with skeleton placeholders
+- **Files to modify**: `FeedViewModel.kt`, `FeedScreen.kt`
 
-#### [MODIFY] [MainActivity.kt](file:///D:/Apps_Softwares/AstroXplore/app/src/main/java/com/example/astroxplore/MainActivity.kt)
-- Call `installSplashScreen()` before `super.onCreate()`.
-- Use `setKeepOnScreenCondition` to wait for Supabase/Hilt initialization before transitioning to the main UI.
+#### 5. UI Components
+- **FeedScreen.kt**: Update to handle the new loading states and ensure header visibility
+- **GroupPickerSheet.kt**: Ensure it works with the new feed structure
+- **PaperCard.kt**: Ensure clickable areas are properly defined for the new header layout
 
-#### [DELETE] [SplashScreen.kt](file:///D:/Apps_Softwares/AstroXplore/app/src/main/java/com/example/astroxplore/features/splash/ui/SplashScreen.kt)
-- Remove the legacy custom splash screen and its navigation logic in `AppNavGraph`.
+### Implementation Plan
 
-## Verification Plan
+1. **Update FeedViewModel.kt**: Add state for loading more content and ensure proper state management
+2. **Update FeedScreen.kt**:
+   - Fix scroll-to-top behavior on initial load
+   - Ensure header remains visible when appropriate
+   - Add skeleton loading states for better UX
+3. **UI Components**
+   - Create a new `OfflineFeedState` composable for the "you're offline" message
+   - Ensure the "Go to Library" CTA is prominent
 
-### Manual Verification
-1. **Cold Start**: Verify the native icon appears immediately when tapping the app icon.
-2. **Transition**: Ensure a seamless transition from the native splash to either the Login or Feed screen.
-3. **OS Compatibility**: Test on Android 11 (legacy) and Android 12+ (modern) to ensure consistent behavior.
+### Implementation Steps
+
+1.  **Update FeedViewModel.kt**:
+   - Add `isLoadingMore` state
+   - Implement `loadNextPage()` function
+   - Ensure proper state management for feed items
+
+2. **Update FeedScreen.kt**:
+   - Ensure proper scroll-to-top behavior on entry
+   - Add skeleton loading indicators
+   - Ensure header visibility logic is robust
+
+3. **UI Components**
+   - Update `GroupPickerSheet.kt` to handle new feed structure
+   - Verify all Composable functions are up to date
+
+4. **Verification**
+   - Run build to ensure no regressions
+   - Test on multiple device configurations
+   - Verify header visibility on first load
+
+### Implementation Plan
+
+1.  **Update FeedViewModel.kt**:
+   - Add `isLoadingMore` state
+   - Implement `loadNextPage()` function
+   - Ensure proper state management for feed data
+
+2.  **Update FeedScreen.kt**:
+   - Fix scroll-to-top behavior
+   - Add skeleton loading indicators
+   - Ensure header stays visible during refreshes
+
+3.  **UI Components**
+   - Create `OfflineFeedState` composable
+   - Update `Scaffold` layout to accommodate new content
+   - Ensure all UI states are properly handled
+
+### Implementation Details:
+
+1.  **Feed ViewModel Enhancements**:
+   - Add `_isLoadingMore` state
+   - Implement `refresh()` and `loadNextPage()` methods with proper error handling
+   - Ensure `feedPapers` StateFlow correctly combines local cache and remote data
+
+2.  **FeedScreen.kt Updates**:
+   - Add `isLoadingMore` state
+   - Implement `animateScrollToItem` for smooth scrolling
+   - Add `OfflineFeedState` composable for offline feedback
+   - Ensure header visibility logic is robust
+
+Let's proceed with the implementation.
+
+<tool_call>
+<function=set_plan_state>
+<parameter=state>
+REFINING

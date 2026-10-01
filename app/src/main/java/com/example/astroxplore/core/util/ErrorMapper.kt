@@ -18,9 +18,10 @@ object ErrorMapper {
             is UnknownHostException, is IOException -> R.string.error_network
             is AuthRestException -> {
                 // Supabase Auth specific error codes
-                when (e.error) {
-                    "invalid_credentials", "invalid_grant" -> R.string.error_invalid_credentials
-                    "user_already_exists" -> R.string.error_user_exists
+                when {
+                    e.error == "invalid_credentials" || e.error == "invalid_grant" -> R.string.error_invalid_credentials
+                    e.error == "user_already_exists" -> R.string.error_user_exists
+                    e.error == "over_email_send_rate_limit" || e.message?.contains("rate limit") == true -> R.string.error_rate_limit
                     else -> R.string.error_unknown
                 }
             }

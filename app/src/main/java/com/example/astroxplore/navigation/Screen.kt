@@ -2,19 +2,29 @@ package com.example.astroxplore.navigation
 
 import kotlinx.serialization.Serializable
 
-sealed interface Screen {
+@Serializable
+public sealed interface Screen {
+    @Serializable
+    data object AuthGraph : Screen
+
+    @Serializable
+    data object OnboardingGraph : Screen
+
+    @Serializable
+    data object MainGraph : Screen
+
     @Serializable
     data object Feed : Screen
-    
+
     @Serializable
     data object Groups : Screen
-    
+
     @Serializable
     data class Explore(val autofocus: Boolean = false) : Screen
-    
+
     @Serializable
     data object Library : Screen
-    
+
     @Serializable
     data object Profile : Screen
 

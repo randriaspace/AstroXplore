@@ -48,7 +48,7 @@ data class UserPreference(
 @Serializable
 data class KeywordModel(
     @SerialName("id")
-    val id: Int? = null,
+    val id: String? = null,
     @SerialName("name")
     val name: String,
     @SerialName("category")

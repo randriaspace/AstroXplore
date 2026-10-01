@@ -1,7 +1,31 @@
+/**
+ * FeedScreen - Main UI screen for displaying the feed of papers in the AstroXplore app.
+ *
+ * This composable displays a list of papers using a LazyColumn, supports pull-to-refresh,
+ * infinite scroll loading, offline state handling, and various interactive elements such as
+ * paper cards, search, and group picker. It interacts with FeedViewModel via Hilt dependency injection
+ * to obtain feed papers, UI state, and error handling.
+ *
+ * Key Features:
+ * - Displays papers with PaperCard composable, includes save and click actions.
+ * - Handles loading states, error states, and empty results.
+ * - Supports infinite scroll via LazyColumn's scroll state.
+ * - Provides top bar with branding, notifications, and profile access.
+ * - Includes quick filter tabs for user interests.
+ * - Integrates with GroupPickerSheet for grouping papers.
+ *
+ * @author AstroXplore Team
+ * @since 1.0
+ */
 package com.example.astroxplore.features.feed.ui
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.astroxplore.R
 import com.example.astroxplore.features.feed.model.PaperModel
+import com.example.astroxplore.core.ui.components.OfflineFallbackState
 import com.example.astroxplore.features.feed.ui.components.PaperCard
 import com.example.astroxplore.features.feed.ui.components.PaperCardSkeleton
 import com.example.astroxplore.features.groups.ui.components.GroupPickerSheet
@@ -43,7 +68,7 @@ fun FeedScreen(
     viewModel: FeedViewModel = hiltViewModel(),
     onSearchClick: () -> Unit = {},
     onPaperClick: (String) -> Unit = {},
-    onLibraryClick: () -> Unit = {}
+    onLibraryClick: () -> Unit = {},
 ) {
     val papers by viewModel.feedPapers.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
@@ -66,7 +91,7 @@ fun FeedScreen(
             val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
                 ?: return@derivedStateOf false
             
-            lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 5
+            lastVisibleItem.index >= (listState.layoutInfo.totalItemsCount - 5)
         }
     }
 
@@ -108,7 +133,7 @@ fun FeedScreen(
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
                     tonalElevation = 2.dp
                 ) {
-                    Column(modifier = Modifier.statusBarsPadding()) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                         AnimatedVisibility(
                             visible = isHeaderVisible.value,
                             enter = expandVertically() + fadeIn(),
@@ -169,7 +194,6 @@ fun FeedScreen(
                                 onSaveClick = { viewModel.toggleSavePaper(paper) },
                                 onTitleClick = { onPaperClick(paper.bibcode) },
                                 onReadMoreClick = { onPaperClick(paper.bibcode) },
-                                onAuthorsClick = { onPaperClick(paper.bibcode) },
                                 onMoreClick = {
                                     selectedPaperForGroup = paper
                                     showGroupPicker = true
@@ -330,29 +354,10 @@ fun EndOfFeedMessage() {
 
 @Composable
 fun OfflineFeedState(onLibraryClick: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.CloudOff,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(text = "You're offline", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text(
-            text = "Discovery requires an internet connection. Visit your Library to read saved papers.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(vertical = 8.dp)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onLibraryClick, shape = MaterialTheme.shapes.medium) { Text("Go to Library") }
-    }
+    OfflineFallbackState(
+        message = "Discovery requires an internet connection. Visit your Library to read saved papers.",
+        onLibraryClick = onLibraryClick
+    )
 }
 
 @Composable

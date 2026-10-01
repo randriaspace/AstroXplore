@@ -5,6 +5,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -12,7 +13,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -44,8 +51,6 @@ fun SignupScreen(
 ) {
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
-    var institution by remember { mutableStateOf("") }
-    var orcidId by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -71,17 +76,16 @@ fun SignupScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // High-end Mesh Gradient Background
-        val gradientColor = MaterialTheme.colorScheme.secondary.copy(alpha = if (darkTheme) 0.3f else 0.1f)
+        val gradientColor = MaterialTheme.colorScheme.primary.copy(alpha = if (darkTheme) 0.36f else 0.12f)
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .alpha(0.6f)
+                .alpha(0.72f)
                 .background(
                     Brush.radialGradient(
                         colors = listOf(gradientColor, Color.Transparent),
-                        center = Offset(1000f, 1000f),
-                        radius = 2000f
+                        center = Offset(0f, 0f),
+                        radius = 1800f
                     )
                 )
         )
@@ -101,7 +105,7 @@ fun SignupScreen(
                         navigationIcon = {
                             IconButton(onClick = onNavigateBack) {
                                 Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack, 
+                                    Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = "Back",
                                     tint = MaterialTheme.colorScheme.onBackground
                                 )
@@ -131,163 +135,242 @@ fun SignupScreen(
                             visible = showForm,
                             enter = fadeIn(tween(1000)) + slideInVertically { it / 2 }
                         ) {
-                            Column {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_splash_logo),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(60.dp),
-                                    tint = MaterialTheme.colorScheme.primary
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(92.dp)
+                                        .background(
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                            shape = MaterialTheme.shapes.extraLarge
+                                        )
+                                        .align(Alignment.CenterHorizontally),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_splash_logo),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(60.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(18.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "AstroPulse",
+                                        style = MaterialTheme.typography.displaySmall.copy(
+                                            fontWeight = FontWeight.ExtraBold,
+                                            letterSpacing = (-1.4).sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                    Surface(
+                                        shape = MaterialTheme.shapes.small,
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                    ) {
+                                        Text(
+                                            text = "ARXIV",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                        )
+                                    }
+                                }
+
+                                Text(
+                                    text = "High-energy Astrophysics Preprint Network",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f)
                                 )
-                                
+
                                 Spacer(modifier = Modifier.height(24.dp))
 
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = onNavigateToLogin,
+                                        modifier = Modifier.weight(1f).height(54.dp),
+                                        shape = MaterialTheme.shapes.extraLarge,
+                                        border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground)
+                                    ) {
+                                        Text(text = "Sign In", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    Button(
+                                        onClick = { /* Register action handled below */ },
+                                        modifier = Modifier.weight(1f).height(54.dp),
+                                        shape = MaterialTheme.shapes.extraLarge,
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    ) {
+                                        Text(text = "Register", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(28.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Create Researcher Account",
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                        modifier = Modifier.size(32.dp)
+                                    ) { Box(contentAlignment = Alignment.Center) { Text("✦") } }
+                                }
+
+                                Spacer(modifier = Modifier.height(18.dp))
+
+                                GoogleAuthBrandButton(isSignUp = true)
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                FilledTonalButton(
+                                    onClick = { },
+                                    enabled = false,
+                                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                                    shape = MaterialTheme.shapes.extraLarge,
+                                    colors = ButtonDefaults.filledTonalButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Surface(
+                                                shape = CircleShape,
+                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                                modifier = Modifier.size(28.dp)
+                                            ) { Box(contentAlignment = Alignment.Center) { Text("O", fontWeight = FontWeight.Bold) } }
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Text("Institutional SSO", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                        }
+                                        Text("Soon", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(22.dp))
+
                                 Text(
-                                    text = stringResource(R.string.signup),
-                                    style = MaterialTheme.typography.displayMedium.copy(
-                                        fontWeight = FontWeight.ExtraBold,
-                                        letterSpacing = (-2).sp
-                                    ),
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                
-                                Text(
-                                    text = "Begin your academic career in the stars.",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                                    text = "OR STANDARD REGISTRATION",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
                                 )
 
-                                Spacer(modifier = Modifier.height(48.dp))
+                                Spacer(modifier = Modifier.height(18.dp))
 
-                                // Immersive Form
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                     OutlinedTextField(
                                         value = firstName,
                                         onValueChange = { firstName = it },
-                                        label = { Text(stringResource(R.string.first_name), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)) },
                                         modifier = Modifier.weight(1f),
-                                        shape = MaterialTheme.shapes.extraLarge,
+                                        label = { Text("First Name") },
                                         singleLine = true,
+                                        shape = MaterialTheme.shapes.extraLarge,
                                         colors = OutlinedTextFieldDefaults.colors(
                                             focusedTextColor = MaterialTheme.colorScheme.onBackground,
                                             unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
                                             focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                            unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f),
-                                            focusedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f),
-                                            unfocusedContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.05f)
+                                            unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f),
+                                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
                                         )
                                     )
                                     OutlinedTextField(
                                         value = lastName,
                                         onValueChange = { lastName = it },
-                                        label = { Text(stringResource(R.string.last_name), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)) },
                                         modifier = Modifier.weight(1f),
-                                        shape = MaterialTheme.shapes.extraLarge,
+                                        label = { Text("Last Name") },
                                         singleLine = true,
+                                        shape = MaterialTheme.shapes.extraLarge,
                                         colors = OutlinedTextFieldDefaults.colors(
                                             focusedTextColor = MaterialTheme.colorScheme.onBackground,
                                             unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
                                             focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                            unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f),
-                                            focusedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f),
-                                            unfocusedContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.05f)
+                                            unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f),
+                                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
                                         )
                                     )
                                 }
 
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                OutlinedTextField(
-                                    value = institution,
-                                    onValueChange = { institution = it },
-                                    label = { Text("Institution / University", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    leadingIcon = { Icon(Icons.Default.Business, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)) },
-                                    shape = MaterialTheme.shapes.extraLarge,
-                                    singleLine = true,
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                                        unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
-                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                        unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f),
-                                        focusedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f),
-                                        unfocusedContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.05f)
-                                    )
-                                )
-
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                OutlinedTextField(
-                                    value = orcidId,
-                                    onValueChange = { orcidId = it },
-                                    label = { Text("ORCID iD (Optional)", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    leadingIcon = { Icon(Icons.Default.School, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)) },
-                                    shape = MaterialTheme.shapes.extraLarge,
-                                    singleLine = true,
-                                    placeholder = { Text("0000-0000-0000-0000") },
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                                        unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
-                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                        unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f),
-                                        focusedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f),
-                                        unfocusedContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.05f)
-                                    )
-                                )
-
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(18.dp))
 
                                 OutlinedTextField(
                                     value = email,
                                     onValueChange = { email = it },
-                                    label = { Text(stringResource(R.string.email), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)) },
                                     modifier = Modifier.fillMaxWidth(),
-                                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)) },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                                    shape = MaterialTheme.shapes.extraLarge,
+                                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)) },
+                                    label = { Text("Academic / Institutional Email") },
                                     singleLine = true,
+                                    shape = MaterialTheme.shapes.extraLarge,
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedTextColor = MaterialTheme.colorScheme.onBackground,
                                         unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
                                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                        unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f),
-                                        focusedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f),
-                                        unfocusedContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.05f)
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f),
+                                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
                                     )
                                 )
 
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(18.dp))
 
                                 OutlinedTextField(
                                     value = password,
                                     onValueChange = { password = it },
-                                    label = { Text(stringResource(R.string.password), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)) },
                                     modifier = Modifier.fillMaxWidth(),
-                                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)) },
+                                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)) },
                                     trailingIcon = {
                                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                             Icon(
                                                 imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                                contentDescription = "Toggle password",
-                                                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                                                contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
                                             )
                                         }
                                     },
                                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                                    shape = MaterialTheme.shapes.extraLarge,
+                                    label = { Text("Password") },
                                     singleLine = true,
+                                    shape = MaterialTheme.shapes.extraLarge,
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedTextColor = MaterialTheme.colorScheme.onBackground,
                                         unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
                                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                        unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f),
-                                        focusedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f),
-                                        unfocusedContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.05f)
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f),
+                                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
                                     )
                                 )
 
-                                Spacer(modifier = Modifier.height(40.dp))
+                                Spacer(modifier = Modifier.height(18.dp))
 
                                 Button(
                                     onClick = {
@@ -295,12 +378,10 @@ fun SignupScreen(
                                             email = email,
                                             password = password,
                                             firstName = firstName,
-                                            lastName = lastName,
-                                            institution = institution,
-                                            orcidId = orcidId
+                                            lastName = lastName
                                         )
                                     },
-                                    modifier = Modifier.fillMaxWidth().height(64.dp),
+                                    modifier = Modifier.fillMaxWidth().height(58.dp),
                                     enabled = uiState !is SignupUiState.Loading &&
                                             email.isNotEmpty() && password.isNotEmpty() &&
                                             firstName.isNotEmpty() && lastName.isNotEmpty(),
@@ -312,31 +393,28 @@ fun SignupScreen(
                                 ) {
                                     AnimatedContent(targetState = uiState is SignupUiState.Loading, label = "loading") { isLoading ->
                                         if (isLoading) {
-                                            LottieLoadingView(
-                                                size = 40,
-                                                resId = R.raw.book_loader
-                                            )
+                                            LottieLoadingView(size = 36, resId = R.raw.book_loader)
                                         } else {
-                                            Text(text = stringResource(R.string.signup), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                            Text(text = "Create Academic Account", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(32.dp))
+                                Spacer(modifier = Modifier.height(20.dp))
 
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.Center
                                 ) {
-                                    Text(stringResource(R.string.already_have_account_prefix), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+                                    Text("Already have an account? ", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f))
                                     TextButton(onClick = onNavigateToLogin) {
-                                        Text(stringResource(R.string.login), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                        Text("Sign In", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
                         }
-                        
+
                         Spacer(modifier = Modifier.height(48.dp))
                     }
                 }

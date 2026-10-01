@@ -79,7 +79,7 @@ class InterestsViewModel @Inject constructor(
         _selectedInterests.value = current
     }
 
-    fun saveInterests(onSuccess: () -> Unit) {
+    fun saveInterests() {
         val user = authRepository.currentUser ?: return
         val current = _selectedInterests.value
         if (current.size !in 3..6) return
@@ -89,7 +89,6 @@ class InterestsViewModel @Inject constructor(
             try {
                 profileRepository.syncUserPreferences(user.id, current)
                 _saveStatus.value = SaveStatus.Success
-                onSuccess()
             } catch (e: Exception) {
                 _saveStatus.value = SaveStatus.Error(e.localizedMessage ?: "Unknown error occurred")
             }

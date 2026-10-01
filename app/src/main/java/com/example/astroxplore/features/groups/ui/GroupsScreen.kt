@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.astroxplore.R
 import com.example.astroxplore.core.ui.components.LottieLoadingView
+import com.example.astroxplore.core.ui.components.OfflineFallbackState
 import com.example.astroxplore.features.groups.model.GroupModel
 import kotlinx.coroutines.flow.collectLatest
 
@@ -30,9 +31,11 @@ import kotlinx.coroutines.flow.collectLatest
 @Composable
 fun GroupsScreen(
     onGroupClick: (String) -> Unit,
+    onLibraryClick: () -> Unit = {},
     viewModel: GroupsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     var showCreateSheet by remember { mutableStateOf(false) }
     var showJoinDialog by remember { mutableStateOf(false) }
@@ -61,6 +64,7 @@ fun GroupsScreen(
                         letterSpacing = (-0.5).sp
                     ) 
                 },
+                windowInsets = WindowInsets(0.dp),
                 actions = {
                     IconButton(onClick = { showJoinDialog = true }) {
                         Icon(Icons.Outlined.GroupAdd, contentDescription = "Join Club")
@@ -93,7 +97,12 @@ fun GroupsScreen(
                     )
                 }
                 is GroupsUiState.Success -> {
-                    if (state.groups.isEmpty() && !isRefreshing) {
+                    if (!isOnline && state.groups.isEmpty()) {
+                        OfflineFallbackState(
+                            message = "Accessing and joining Journal Clubs requires an internet connection. Visit your Library to view your saved papers.",
+                            onLibraryClick = onLibraryClick
+                        )
+                    } else if (state.groups.isEmpty() && !isRefreshing) {
                         EmptyGroupsState()
                     } else {
                         LazyColumn(
@@ -101,6 +110,33 @@ fun GroupsScreen(
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
+                            if (!isOnline) {
+                                item {
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                        )
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                Icons.Default.CloudOff,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "Working offline. Cached Journal Clubs are shown.",
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                             items(state.groups, key = { it.id }) { group ->
                                 GroupCard(group = group, onClick = { onGroupClick(group.id) })
                             }

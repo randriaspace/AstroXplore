@@ -34,14 +34,17 @@ import com.example.astroxplore.features.feed.ui.components.PaperCard
 import com.example.astroxplore.features.feed.ui.components.PaperDetailsBottomSheet
 import com.example.astroxplore.features.feed.ui.components.PaperCardSkeleton
 import com.example.astroxplore.core.ui.components.LottieLoadingView
+import com.example.astroxplore.core.ui.components.OfflineFallbackState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExploreScreen(
     autofocus: Boolean = false,
     viewModel: ExploreViewModel = hiltViewModel(),
-    onPaperClick: (String) -> Unit = {}
+    onPaperClick: (String) -> Unit = {},
+    onLibraryClick: () -> Unit = {}
 ) {
+    val isOnline by viewModel.isOnline.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val query by viewModel.searchQuery.collectAsState()
     val filter by viewModel.searchFilter.collectAsState()
@@ -50,7 +53,6 @@ fun ExploreScreen(
     
     var showFilterSheet by remember { mutableStateOf(false) }
     var selectedPaperForDetails by remember { mutableStateOf<PaperModel?>(null) }
-    var showAuthorsOnly by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -63,6 +65,7 @@ fun ExploreScreen(
                         letterSpacing = (-0.5).sp
                     ) 
                 },
+                windowInsets = WindowInsets(0.dp),
                 actions = {
                     BadgedBox(
                         badge = {
@@ -148,18 +151,24 @@ fun ExploreScreen(
                     },
                     label = "search_results"
                 ) { state ->
-                    when (state) {
-                        ExploreUiState.Idle -> SearchIdleState(
-                            suggestedKeywords = suggestedKeywords,
-                            onKeywordClick = { viewModel.onQueryChange(it) }
+                    if (!isOnline && (state is ExploreUiState.Idle || state is ExploreUiState.Error || (state is ExploreUiState.Success && state.results.isEmpty()))) {
+                        OfflineFallbackState(
+                            message = "Discovery and search require an internet connection. Visit your Library to read saved papers.",
+                            onLibraryClick = onLibraryClick
                         )
-                        ExploreUiState.Loading -> {
-                            LottieLoadingView(size = 150)
-                        }
-                        is ExploreUiState.Success -> {
-                            if (state.results.isEmpty()) {
-                                EmptyResultsState()
-                            } else {
+                    } else {
+                        when (state) {
+                            ExploreUiState.Idle -> SearchIdleState(
+                                suggestedKeywords = suggestedKeywords,
+                                onKeywordClick = { viewModel.onQueryChange(it) }
+                            )
+                            ExploreUiState.Loading -> {
+                                LottieLoadingView(size = 150)
+                            }
+                            is ExploreUiState.Success -> {
+                                if (state.results.isEmpty()) {
+                                    EmptyResultsState()
+                                } else {
                                 Column {
                                     // Merged Sorting & Count Row
                                     Row(
@@ -220,11 +229,6 @@ fun ExploreScreen(
                                                 onTitleClick = { onPaperClick(paper.bibcode) },
                                                 onReadMoreClick = {
                                                     selectedPaperForDetails = paper
-                                                    showAuthorsOnly = false
-                                                },
-                                                onAuthorsClick = {
-                                                    selectedPaperForDetails = paper
-                                                    showAuthorsOnly = true
                                                 }
                                             )
                                         }
@@ -237,6 +241,7 @@ fun ExploreScreen(
                 }
             }
         }
+    }
     }
 
     if (showFilterSheet) {
@@ -251,7 +256,7 @@ fun ExploreScreen(
     if (selectedPaperForDetails != null) {
         PaperDetailsBottomSheet(
             paper = selectedPaperForDetails!!,
-            showAuthorsOnly = showAuthorsOnly,
+            showAuthorsOnly = false,
             onDismiss = { selectedPaperForDetails = null },
             onNavigateToDetails = onPaperClick
         )

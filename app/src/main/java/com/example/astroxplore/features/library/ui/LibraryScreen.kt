@@ -37,6 +37,7 @@ fun LibraryScreen(
                         fontWeight = FontWeight.ExtraBold
                     ) 
                 },
+                windowInsets = WindowInsets(0.dp),
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         }

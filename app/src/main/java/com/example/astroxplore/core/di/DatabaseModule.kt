@@ -67,4 +67,10 @@ object DatabaseModule {
     fun provideGroupPaperDao(database: AppDatabase): GroupPaperDao {
         return database.groupPaperDao()
     }
+
+    @Provides
+    @Singleton
+    fun providePendingPaperDeletionDao(database: AppDatabase): com.example.astroxplore.core.database.dao.PendingPaperDeletionDao {
+        return database.pendingPaperDeletionDao()
+    }
 }

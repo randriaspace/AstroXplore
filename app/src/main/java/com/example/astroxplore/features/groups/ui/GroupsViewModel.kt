@@ -2,6 +2,7 @@ package com.example.astroxplore.features.groups.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.astroxplore.core.network.NetworkConnectivityObserver
 import com.example.astroxplore.features.groups.data.GroupRepository
 import com.example.astroxplore.features.groups.model.GroupModel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -11,8 +12,16 @@ import javax.inject.Inject
 
 @HiltViewModel
 class GroupsViewModel @Inject constructor(
-    private val groupRepository: GroupRepository
+    private val groupRepository: GroupRepository,
+    networkConnectivityObserver: NetworkConnectivityObserver
 ) : ViewModel() {
+
+    val isOnline: StateFlow<Boolean> = networkConnectivityObserver.isConnected
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing = _isRefreshing.asStateFlow()

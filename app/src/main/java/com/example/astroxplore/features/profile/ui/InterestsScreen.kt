@@ -25,6 +25,7 @@ import com.example.astroxplore.core.ui.components.LottieLoadingView
 @Composable
 fun InterestsScreen(
     onNavigateBack: () -> Unit,
+    onPreferencesUpdated: () -> Unit = onNavigateBack,
     modifier: Modifier = Modifier,
     viewModel: InterestsViewModel = hiltViewModel()
 ) {
@@ -38,7 +39,7 @@ fun InterestsScreen(
 
     LaunchedEffect(saveStatus) {
         if (saveStatus is SaveStatus.Success) {
-            onNavigateBack()
+            onPreferencesUpdated()
         }
     }
 
@@ -109,7 +110,7 @@ fun InterestsScreen(
                         )
 
                         Button(
-                            onClick = { viewModel.saveInterests(onNavigateBack) },
+                            onClick = { viewModel.saveInterests() },
                             enabled = isSelectionValid && saveStatus !is SaveStatus.Loading,
                             modifier = Modifier.fillMaxWidth().height(56.dp),
                             shape = MaterialTheme.shapes.extraLarge,
