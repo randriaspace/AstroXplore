@@ -1,0 +1,8 @@
+{
+  "name": "AstroXplore",
+  "description": "Astrophysics research paper explorer and journal club collaboration app powered by NASA ADS and Supabase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

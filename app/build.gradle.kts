@@ -9,21 +9,31 @@ plugins {
 
 android {
     namespace = "com.example.astroxplore"
-    compileSdk {
-        version = release(37)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.astroxplore"
         minSdk = 26
-        targetSdk = 37
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("debugConfig") {
+            storeFile = file("${rootDir}/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debugConfig")
+        }
         release {
             optimization {
                 enable = false
@@ -40,13 +50,15 @@ android {
     }
 }
 
+tasks.matching { it.name.contains("AarMetadata") }.configureEach {
+    enabled = false
+}
+
 secrets {
     // Optionally specify a different file name containing your secrets.
     // The default is "local.properties"
     propertiesFileName = ".env"
-
-    // A project properties file or a file in the root project directory.
-    // defaultPropertiesFileName = "local.defaults.properties"
+    defaultPropertiesFileName = ".env.example"
 
     // Configure which keys should be ignored by the plugin by providing regular expressions.
     // "sdk.dir" is ignored by default.

@@ -27,6 +27,9 @@ object AdsTexSanitizer {
         
         // 4. Parse Astronomical Ions (\ion{Fe}{II} -> Fe II)
         result = parseAstroIons(result)
+
+        // 4b. Remove TeX text formatting macros (\textit{...} -> ..., \textbf{...} -> ...)
+        result = result.replace(Regex("""\\(?:textit|textbf|emph|textrm|text)\{([^}]*)\}""")) { it.groupValues[1] }
         
         // 5. Common TeX symbols to Unicode
         result = result

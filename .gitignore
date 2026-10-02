@@ -15,3 +15,8 @@
 local.properties
 .github/skills/
 .artifacts
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example

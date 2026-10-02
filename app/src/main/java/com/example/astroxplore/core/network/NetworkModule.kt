@@ -66,9 +66,11 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideSupabaseClient(): SupabaseClient {
+        val url = BuildConfig.SUPABASE_URL.ifBlank { "https://placeholder.supabase.co" }
+        val key = BuildConfig.SUPABASE_ANON_KEY.ifBlank { "placeholder-key" }
         return createSupabaseClient(
-            supabaseUrl = BuildConfig.SUPABASE_URL,
-            supabaseKey = BuildConfig.SUPABASE_ANON_KEY
+            supabaseUrl = url,
+            supabaseKey = key
         ) {
             install(Auth) {
                 // Keep user logged in across restarts
