@@ -2,21 +2,8 @@ package com.example.astroxplore.core.database
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
-import com.example.astroxplore.core.database.dao.FeedPaperDao
-import com.example.astroxplore.core.database.dao.GroupDao
-import com.example.astroxplore.core.database.dao.GroupPaperDao
-import com.example.astroxplore.core.database.dao.KeywordDao
-import com.example.astroxplore.core.database.dao.ProfileDao
-import com.example.astroxplore.core.database.dao.PendingPaperDeletionDao
-import com.example.astroxplore.core.database.dao.SavedPaperDao
-import com.example.astroxplore.core.database.entity.FeedPaperEntity
-import com.example.astroxplore.core.database.entity.GroupEntity
-import com.example.astroxplore.core.database.entity.GroupPaperEntity
-import com.example.astroxplore.core.database.entity.KeywordEntity
-import com.example.astroxplore.core.database.entity.PendingPaperDeletionEntity
-import com.example.astroxplore.core.database.entity.ProfileEntity
-import com.example.astroxplore.core.database.entity.SavedPaperEntity
-import com.example.astroxplore.core.database.entity.UserPreferenceEntity
+import com.example.astroxplore.core.database.dao.*
+import com.example.astroxplore.core.database.entity.*
 
 @Database(
     entities = [
@@ -27,9 +14,12 @@ import com.example.astroxplore.core.database.entity.UserPreferenceEntity
         GroupEntity::class,
         ProfileEntity::class,
         GroupPaperEntity::class,
-        PendingPaperDeletionEntity::class
+        PendingPaperDeletionEntity::class,
+        GroupPresentationEntity::class,
+        GroupReviewEntity::class,
+        GroupMemberEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -40,4 +30,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun profileDao(): ProfileDao
     abstract fun groupPaperDao(): GroupPaperDao
     abstract fun pendingPaperDeletionDao(): PendingPaperDeletionDao
+    abstract fun groupPresentationDao(): GroupPresentationDao
+    abstract fun groupReviewDao(): GroupReviewDao
+    abstract fun groupMemberDao(): GroupMemberDao
 }

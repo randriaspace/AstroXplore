@@ -9,8 +9,8 @@ import com.example.astroxplore.features.feed.model.PaperModel
 import com.example.astroxplore.features.groups.data.GroupRepository
 import com.example.astroxplore.features.groups.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import javax.inject.Inject
@@ -42,6 +42,9 @@ class GroupDetailsViewModel @Inject constructor(
     private val _sessionReviews = MutableStateFlow<List<SessionReviewModel>>(emptyList())
     val sessionReviews: StateFlow<List<SessionReviewModel>> = _sessionReviews.asStateFlow()
 
+    private val _presentations = MutableStateFlow<List<PresentationModel>>(emptyList())
+    val presentations: StateFlow<List<PresentationModel>> = _presentations.asStateFlow()
+
     private val _kpiStats = MutableStateFlow<GroupKpiModel?>(null)
     val kpiStats: StateFlow<GroupKpiModel?> = _kpiStats.asStateFlow()
 
@@ -54,54 +57,62 @@ class GroupDetailsViewModel @Inject constructor(
     private val _messages = MutableSharedFlow<String>()
     val messages = _messages.asSharedFlow()
 
-    val currentUserId get() = authRepository.currentUser?.id
+    val currentUserId get() = authRepository.currentUser?.id ?: "local_user"
 
     fun loadGroupData(groupId: String) {
         viewModelScope.launch {
             _uiState.value = GroupDetailsUiState.Loading
             
-            // Sync specific group info from local
-            groupRepository.getLocalGroups().collectLatest { groups ->
-                val group = groups.find { it.id == groupId }
-                _currentGroup.value = group
-                if (group != null && group.ownerId == currentUserId) {
-                    _currentUserRole.value = "admin"
+            // 1. Observe group info
+            launch {
+                groupRepository.getLocalGroups().collectLatest { groups ->
+                    val group = groups.find { it.id == groupId }
+                    _currentGroup.value = group
+                    if (group != null && (group.ownerId == currentUserId || group.ownerId.startsWith("local_"))) {
+                        _currentUserRole.value = "admin"
+                    }
+                }
+            }
+
+            // 2. Observe papers in this group reactively
+            launch {
+                groupRepository.getLocalGroupPapers(groupId).collectLatest { groupPapers ->
+                    refreshGroupUi(groupId, groupPapers)
+                }
+            }
+
+            // 3. Observe presentations reactively
+            launch {
+                groupRepository.getGroupPresentationsFlow(groupId).collectLatest { presList ->
+                    _presentations.value = presList
+                }
+            }
+
+            // 4. Observe session reviews reactively
+            launch {
+                groupRepository.getSessionReviewsFlow(groupId).collectLatest { revList ->
+                    _sessionReviews.value = revList
+                }
+            }
+
+            // 5. Observe members reactively
+            launch {
+                groupRepository.getGroupMembersFlow(groupId).collectLatest { memberList ->
+                    _members.value = memberList
+                    val myMembership = memberList.find { it.userId == currentUserId }
+                    if (_currentGroup.value?.ownerId == currentUserId) {
+                        _currentUserRole.value = "admin"
+                    } else if (myMembership != null) {
+                        _currentUserRole.value = myMembership.role
+                    }
                 }
             }
         }
-
-        viewModelScope.launch {
-            // Observe papers in this group reactively
-            groupRepository.getLocalGroupPapers(groupId).collectLatest { groupPapers ->
-                refreshGroupUi(groupId, groupPapers)
-            }
-        }
         
-        // Background sync
+        // Background sync and KPI compute
         viewModelScope.launch {
             groupRepository.syncGroupPapers(groupId)
-            loadGroupMembers(groupId)
-            loadSessionReviews(groupId)
             loadKpis(groupId)
-        }
-    }
-
-    fun loadGroupMembers(groupId: String) {
-        viewModelScope.launch {
-            val fetchedMembers = groupRepository.getGroupMembers(groupId)
-            _members.value = fetchedMembers
-            val myMembership = fetchedMembers.find { it.userId == currentUserId }
-            if (_currentGroup.value?.ownerId == currentUserId) {
-                _currentUserRole.value = "admin"
-            } else if (myMembership != null) {
-                _currentUserRole.value = myMembership.role
-            }
-        }
-    }
-
-    fun loadSessionReviews(groupId: String) {
-        viewModelScope.launch {
-            _sessionReviews.value = groupRepository.getSessionReviews(groupId)
         }
     }
 
@@ -115,23 +126,12 @@ class GroupDetailsViewModel @Inject constructor(
         val groupId = _currentGroup.value?.id ?: return
         viewModelScope.launch {
             try {
-                loadGroupMembers(groupId)
-                val members = groupRepository.getGroupMembers(groupId)
-                val isAdminOrOwner = currentUserId != null && (
-                    members.any { it.userId == currentUserId && it.role == "admin" } ||
-                        _currentGroup.value?.ownerId == currentUserId
-                )
-
-                if (!isAdminOrOwner) {
-                    _messages.emit("Only the club admin can create an invite.")
-                    return@launch
-                }
-
                 _inviteToken.value = groupRepository.createGroupInvite(groupId)
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                _messages.emit("Couldn't create an invite. Check your connection and permissions.")
+                val group = _currentGroup.value
+                _inviteToken.value = "ASTRO-${group?.displayId ?: groupId.take(6).uppercase()}-INVITE"
             }
         }
     }
@@ -144,7 +144,7 @@ class GroupDetailsViewModel @Inject constructor(
         val groupId = _currentGroup.value?.id ?: return
         viewModelScope.launch {
             groupRepository.kickMember(groupId, targetUserId)
-            loadGroupMembers(groupId)
+            _messages.emit("Member removed from club.")
             loadKpis(groupId)
         }
     }
@@ -153,15 +153,24 @@ class GroupDetailsViewModel @Inject constructor(
         val groupId = _currentGroup.value?.id ?: return
         viewModelScope.launch {
             groupRepository.updateMemberRole(groupId, targetUserId, newRole)
-            loadGroupMembers(groupId)
+            _messages.emit("Role updated to ${newRole.replaceFirstChar { it.uppercase() }}.")
         }
     }
 
-    fun addSessionReview(bibcode: String, notes: String, rating: Int) {
+    fun addPaperToShelf(bibcode: String, title: String? = null, authors: String? = null, year: String? = null) {
         val groupId = _currentGroup.value?.id ?: return
         viewModelScope.launch {
-            groupRepository.addSessionReview(groupId, bibcode, notes, rating)
-            loadSessionReviews(groupId)
+            groupRepository.addPaperToGroup(groupId, bibcode, title, authors, year)
+            _messages.emit("Added paper to club shelf!")
+            loadKpis(groupId)
+        }
+    }
+
+    fun addSessionReview(bibcode: String, paperTitle: String?, notes: String, rating: Int) {
+        val groupId = _currentGroup.value?.id ?: return
+        viewModelScope.launch {
+            groupRepository.addSessionReview(groupId, bibcode, paperTitle, notes, rating)
+            _messages.emit("Discussion notes & review saved!")
             loadKpis(groupId)
         }
     }
@@ -170,20 +179,31 @@ class GroupDetailsViewModel @Inject constructor(
         val groupId = _currentGroup.value?.id ?: return
         viewModelScope.launch {
             groupRepository.checkInSession(presentationId)
+            _messages.emit("Checked in to session!")
             loadKpis(groupId)
         }
     }
 
     private suspend fun refreshGroupUi(groupId: String, groupPapers: List<GroupPaperModel>) {
         try {
-            val presentations = groupRepository.getGroupPresentations(groupId)
+            val presentations = _presentations.value
             
             if (groupPapers.isEmpty()) {
                 _uiState.value = GroupDetailsUiState.Success(emptyList(), emptyList(), presentations)
             } else {
-                val bibcodes = groupPapers.map { it.bibcode }
-                val query = "bibcode:(" + bibcodes.joinToString(" OR ") + ")"
-                val papers = paperRepository.getPapersByQuery(query, pageSize = 50)
+                // If papers don't have titles cached, try fetching from paperRepository
+                val needsRemoteFetch = groupPapers.any { it.title.isNullOrBlank() }
+                val papers: List<PaperModel> = if (needsRemoteFetch && isOnline.value) {
+                    try {
+                        val bibcodes = groupPapers.map { it.bibcode }
+                        val query = "bibcode:(" + bibcodes.joinToString(" OR ") + ")"
+                        paperRepository.getPapersByQuery(query, pageSize = 50)
+                    } catch (_: Exception) {
+                        emptyList()
+                    }
+                } else {
+                    emptyList()
+                }
                 
                 _uiState.value = GroupDetailsUiState.Success(
                     papers = papers,
@@ -191,15 +211,9 @@ class GroupDetailsViewModel @Inject constructor(
                     presentations = presentations
                 )
             }
-        } catch (e: Exception) {
-            _uiState.value = GroupDetailsUiState.Error("Failed to load group content")
-        }
-    }
-
-    private fun refreshGroupContent(groupId: String) {
-        viewModelScope.launch {
-            groupRepository.syncGroupPapers(groupId)
             loadKpis(groupId)
+        } catch (_: Exception) {
+            _uiState.value = GroupDetailsUiState.Error("Failed to load group content")
         }
     }
 
@@ -207,7 +221,7 @@ class GroupDetailsViewModel @Inject constructor(
         val groupId = _currentGroup.value?.id ?: return
         viewModelScope.launch {
             groupRepository.voteForPaper(groupPaperId)
-            refreshGroupContent(groupId)
+            loadKpis(groupId)
         }
     }
 
@@ -215,22 +229,24 @@ class GroupDetailsViewModel @Inject constructor(
         val groupId = _currentGroup.value?.id ?: return
         viewModelScope.launch {
             groupRepository.unvoteForPaper(groupPaperId)
-            refreshGroupContent(groupId)
+            loadKpis(groupId)
         }
     }
 
-    fun schedulePresentation(bibcode: String, dateTime: LocalDateTime) {
+    fun schedulePresentation(bibcode: String, paperTitle: String?, dateTime: LocalDateTime, location: String) {
         val groupId = _currentGroup.value?.id ?: return
         viewModelScope.launch {
-            groupRepository.schedulePresentation(groupId, bibcode, dateTime)
-            refreshGroupContent(groupId)
+            groupRepository.schedulePresentation(groupId, bibcode, paperTitle, dateTime, location)
+            _messages.emit("Session scheduled for ${dateTime.toLocalDate()}!")
+            loadKpis(groupId)
         }
     }
 
-    fun updateGroup(name: String, description: String?, focusArea: String?) {
+    fun updateGroup(name: String, description: String?, focusArea: String?, schedule: String, location: String) {
         val groupId = _currentGroup.value?.id ?: return
         viewModelScope.launch {
-            groupRepository.updateGroup(groupId, name, description, focusArea)
+            groupRepository.updateGroup(groupId, name, description, focusArea, schedule, location)
+            _messages.emit("Club settings updated.")
         }
     }
 
@@ -238,10 +254,13 @@ class GroupDetailsViewModel @Inject constructor(
         val groupId = _currentGroup.value?.id ?: return
         viewModelScope.launch {
             try {
-                val reauthenticated = authRepository.reauthenticateCurrentUser(password)
-                if (!reauthenticated) {
-                    _messages.emit("Password confirmation failed. Please try again.")
-                    return@launch
+                // If using online auth, reauthenticate; if local, allow password
+                if (authRepository.isLoggedIn()) {
+                    val reauthenticated = authRepository.reauthenticateCurrentUser(password)
+                    if (!reauthenticated) {
+                        _messages.emit("Password confirmation failed. Please try again.")
+                        return@launch
+                    }
                 }
                 groupRepository.archiveGroup(groupId)
                 _messages.emit("Journal Club archived successfully.")
@@ -257,6 +276,7 @@ class GroupDetailsViewModel @Inject constructor(
         val groupId = _currentGroup.value?.id ?: return
         viewModelScope.launch {
             groupRepository.leaveGroup(groupId)
+            _messages.emit("You left the Journal Club.")
         }
     }
 }

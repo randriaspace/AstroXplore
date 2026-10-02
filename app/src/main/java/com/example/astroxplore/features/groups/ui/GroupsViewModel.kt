@@ -6,8 +6,8 @@ import com.example.astroxplore.core.network.NetworkConnectivityObserver
 import com.example.astroxplore.features.groups.data.GroupRepository
 import com.example.astroxplore.features.groups.model.GroupModel
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -33,16 +33,24 @@ class GroupsViewModel @Inject constructor(
     private val _messages = MutableSharedFlow<String>()
     val messages = _messages.asSharedFlow()
 
-    // Offline-First: Reactively observe local database
-    val groups: StateFlow<List<GroupModel>> = groupRepository.getLocalGroups()
+    // Offline-First: Reactively observe joined clubs from Room
+    val myGroups: StateFlow<List<GroupModel>> = groupRepository.getMyGroups()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
 
-    val uiState: StateFlow<GroupsUiState> = groups.map { 
-        GroupsUiState.Success(it) 
+    // Reactively observe discoverable public clubs from Room
+    val exploreGroups: StateFlow<List<GroupModel>> = groupRepository.getExploreGroups()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val uiState: StateFlow<GroupsUiState> = combine(myGroups, exploreGroups) { my, explore ->
+        GroupsUiState.Success(myClubs = my, exploreClubs = explore)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -50,7 +58,10 @@ class GroupsViewModel @Inject constructor(
     )
 
     init {
-        syncGroups()
+        viewModelScope.launch {
+            groupRepository.initSeedDataIfEmpty()
+            syncGroups()
+        }
     }
 
     fun syncGroups() {
@@ -61,10 +72,17 @@ class GroupsViewModel @Inject constructor(
         }
     }
 
-    fun createGroup(name: String, description: String?, focusArea: String?) {
+    fun createGroup(
+        name: String,
+        description: String?,
+        focusArea: String?,
+        schedule: String = "Weekly on Thursdays",
+        location: String = "Google Meet / Seminar Room"
+    ) {
         viewModelScope.launch {
             try {
-                groupRepository.createGroup(name, description, focusArea)
+                val created = groupRepository.createGroup(name, description, focusArea, schedule, location)
+                _messages.emit("Created \"${created.name}\" successfully!")
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -79,10 +97,22 @@ class GroupsViewModel @Inject constructor(
             _joinStatus.emit(success)
         }
     }
+
+    fun joinPublicClub(groupId: String, clubName: String) {
+        viewModelScope.launch {
+            val success = groupRepository.joinPublicClub(groupId)
+            if (success) {
+                _messages.emit("Joined \"$clubName\"! Check My Clubs.")
+            }
+        }
+    }
 }
 
 sealed interface GroupsUiState {
     data object Loading : GroupsUiState
-    data class Success(val groups: List<GroupModel>) : GroupsUiState
+    data class Success(
+        val myClubs: List<GroupModel>,
+        val exploreClubs: List<GroupModel>
+    ) : GroupsUiState
     data class Error(val message: String) : GroupsUiState
 }

@@ -3,12 +3,7 @@ package com.example.astroxplore.core.di
 import android.content.Context
 import androidx.room.Room
 import com.example.astroxplore.core.database.AppDatabase
-import com.example.astroxplore.core.database.dao.FeedPaperDao
-import com.example.astroxplore.core.database.dao.GroupDao
-import com.example.astroxplore.core.database.dao.GroupPaperDao
-import com.example.astroxplore.core.database.dao.KeywordDao
-import com.example.astroxplore.core.database.dao.ProfileDao
-import com.example.astroxplore.core.database.dao.SavedPaperDao
+import com.example.astroxplore.core.database.dao.*
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -70,7 +65,25 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun providePendingPaperDeletionDao(database: AppDatabase): com.example.astroxplore.core.database.dao.PendingPaperDeletionDao {
+    fun providePendingPaperDeletionDao(database: AppDatabase): PendingPaperDeletionDao {
         return database.pendingPaperDeletionDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideGroupPresentationDao(database: AppDatabase): GroupPresentationDao {
+        return database.groupPresentationDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideGroupReviewDao(database: AppDatabase): GroupReviewDao {
+        return database.groupReviewDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideGroupMemberDao(database: AppDatabase): GroupMemberDao {
+        return database.groupMemberDao()
     }
 }

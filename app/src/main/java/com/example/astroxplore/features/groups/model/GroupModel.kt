@@ -6,13 +6,16 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class GroupModel(
     @SerialName("id") val id: String,
-    @SerialName("display_id") val displayId: String, // Short unique ID for searching
+    @SerialName("display_id") val displayId: String, // Short unique ID for searching/joining
     @SerialName("name") val name: String,
     @SerialName("description") val description: String? = null,
     @SerialName("owner_id") val ownerId: String,
     @SerialName("focus_area") val focusArea: String? = null,
     @SerialName("member_count") val memberCount: Int = 1,
-    @SerialName("created_at") val createdAt: String? = null
+    @SerialName("created_at") val createdAt: String? = null,
+    val meetingSchedule: String = "Weekly on Thursdays",
+    val meetingLocation: String = "Google Meet / Seminar Room",
+    val isMember: Boolean = true
 )
 
 @Serializable
@@ -22,8 +25,11 @@ data class GroupPaperModel(
     @SerialName("bibcode") val bibcode: String,
     @SerialName("added_by") val addedBy: String,
     @SerialName("vote_count") val voteCount: Int = 0,
-    @SerialName("is_voted_by_me") val isVotedByMe: Boolean = false, // Client side field or calculated
-    @SerialName("added_at") val addedAt: String? = null
+    @SerialName("is_voted_by_me") val isVotedByMe: Boolean = false,
+    @SerialName("added_at") val addedAt: String? = null,
+    val title: String? = null,
+    val authors: String? = null,
+    val year: String? = null
 )
 
 @Serializable
@@ -33,7 +39,12 @@ data class PresentationModel(
     @SerialName("bibcode") val bibcode: String,
     @SerialName("presenter_id") val presenterId: String,
     @SerialName("scheduled_at") val scheduledAt: String,
-    @SerialName("created_at") val createdAt: String? = null
+    @SerialName("created_at") val createdAt: String? = null,
+    val paperTitle: String? = null,
+    val presenterName: String? = "Lead Presenter",
+    val meetingLocation: String? = "Virtual Seminar Room",
+    val attendeeCount: Int = 1,
+    val isCheckedIn: Boolean = false
 )
 
 @Serializable
@@ -42,7 +53,8 @@ data class GroupMemberModel(
     @SerialName("group_id") val groupId: String,
     @SerialName("user_id") val userId: String,
     @SerialName("role") val role: String = "member", // admin, moderator, member
-    @SerialName("joined_at") val joinedAt: String? = null
+    @SerialName("joined_at") val joinedAt: String? = null,
+    val userName: String? = "Fellow Researcher"
 )
 
 @Serializable
@@ -53,7 +65,9 @@ data class SessionReviewModel(
     @SerialName("reviewer_id") val reviewerId: String,
     @SerialName("notes") val notes: String,
     @SerialName("rating") val rating: Int = 5,
-    @SerialName("created_at") val createdAt: String? = null
+    @SerialName("created_at") val createdAt: String? = null,
+    val paperTitle: String? = null,
+    val reviewerName: String? = "Club Member"
 )
 
 @Serializable
@@ -70,5 +84,7 @@ data class GroupKpiModel(
     val totalVotes: Int = 0,
     val totalPresentations: Int = 0,
     val totalMembers: Int = 1,
-    val totalReviews: Int = 0
+    val totalReviews: Int = 0,
+    val participationScore: Int = 85,
+    val meetingStreak: Int = 4
 )
