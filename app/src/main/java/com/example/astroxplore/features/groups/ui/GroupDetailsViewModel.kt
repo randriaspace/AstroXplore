@@ -115,6 +115,18 @@ class GroupDetailsViewModel @Inject constructor(
         val groupId = _currentGroup.value?.id ?: return
         viewModelScope.launch {
             try {
+                loadGroupMembers(groupId)
+                val members = groupRepository.getGroupMembers(groupId)
+                val isAdminOrOwner = currentUserId != null && (
+                    members.any { it.userId == currentUserId && it.role == "admin" } ||
+                        _currentGroup.value?.ownerId == currentUserId
+                )
+
+                if (!isAdminOrOwner) {
+                    _messages.emit("Only the club admin can create an invite.")
+                    return@launch
+                }
+
                 _inviteToken.value = groupRepository.createGroupInvite(groupId)
             } catch (e: CancellationException) {
                 throw e
@@ -222,10 +234,22 @@ class GroupDetailsViewModel @Inject constructor(
         }
     }
 
-    fun archiveGroup() {
+    fun archiveGroupWithPassword(password: String) {
         val groupId = _currentGroup.value?.id ?: return
         viewModelScope.launch {
-            groupRepository.archiveGroup(groupId)
+            try {
+                val reauthenticated = authRepository.reauthenticateCurrentUser(password)
+                if (!reauthenticated) {
+                    _messages.emit("Password confirmation failed. Please try again.")
+                    return@launch
+                }
+                groupRepository.archiveGroup(groupId)
+                _messages.emit("Journal Club archived successfully.")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _messages.emit("Couldn't archive the club. Please try again.")
+            }
         }
     }
 

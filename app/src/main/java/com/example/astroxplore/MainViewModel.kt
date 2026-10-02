@@ -49,26 +49,15 @@ class MainViewModel @Inject constructor(
             authRepository.sessionStatus.collect { status ->
                 if (status is SessionStatus.Authenticated) {
                     val userId = authRepository.currentUser?.id ?: ""
-                    
-                    // Trigger sync when authenticated and online
+
                     if (isOnline.value) {
                         syncAll(userId)
                     }
 
-                    // Fast path: check local settings first
-                    val isLocallyOnboarded = settingsRepository.onboardingComplete.first()
-                    if (isLocallyOnboarded) {
-                        _isOnboarded.value = true
-                    } else {
-                        // Reliable path: fetch from DB
-                        val profile = profileRepository.getProfile(userId)
-                        _isOnboarded.value = profile?.isOnboarded ?: false
-                        
-                        // Sync back to local if true
-                        if (_isOnboarded.value == true) {
-                            settingsRepository.setOnboardingComplete(true)
-                        }
-                    }
+                    val profile = if (userId.isNotBlank()) profileRepository.getProfile(userId) else null
+                    val isRemoteOnboarded = profile?.isOnboarded == true
+                    _isOnboarded.value = isRemoteOnboarded
+                    settingsRepository.setOnboardingComplete(isRemoteOnboarded)
                 } else {
                     _isOnboarded.value = null
                 }

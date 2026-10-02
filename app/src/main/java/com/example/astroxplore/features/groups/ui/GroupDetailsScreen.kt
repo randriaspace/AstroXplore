@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,6 +62,7 @@ fun GroupDetailsScreen(
 
     var showEditSheet by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var archivePassword by remember { mutableStateOf("") }
     var showScheduleSheet by remember { mutableStateOf(false) }
     var showReviewSheet by remember { mutableStateOf(false) }
     var selectedBibcodeForSchedule by remember { mutableStateOf<String?>(null) }
@@ -239,22 +241,43 @@ fun GroupDetailsScreen(
 
     if (showDeleteDialog) {
         AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
+            onDismissRequest = { 
+                archivePassword = ""
+                showDeleteDialog = false 
+            },
             title = { Text("Archive Journal Club?") },
-            text = { Text("The club will leave the active club list. Existing member data remains stored, and no new members can join.") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("This keeps the club in the database, but it is removed from the active club list for members. Enter your password to confirm archive.")
+                    OutlinedTextField(
+                        value = archivePassword,
+                        onValueChange = { archivePassword = it },
+                        label = { Text("Confirm password") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+                }
+            },
             confirmButton = {
                 Button(
-                    onClick = { 
-                        viewModel.archiveGroup()
-                        showDeleteDialog = false
+                    onClick = {
+                        if (archivePassword.isNotBlank()) {
+                            viewModel.archiveGroupWithPassword(archivePassword)
+                            archivePassword = ""
+                            showDeleteDialog = false
+                        }
                     },
+                    enabled = archivePassword.isNotBlank(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
                     Text("Archive Club")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
+                TextButton(onClick = {
+                    archivePassword = ""
+                    showDeleteDialog = false
+                }) { Text("Cancel") }
             }
         )
     }
@@ -899,26 +922,50 @@ fun SchedulePresentationSheet(
     onDismiss: () -> Unit,
     onSchedule: (LocalDateTime) -> Unit
 ) {
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = System.currentTimeMillis() + 24 * 60 * 60 * 1000L
+    )
+    val timePickerState = rememberTimePickerState(initialHour = 18, initialMinute = 30, is24Hour = true)
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(24.dp).navigationBarsPadding()
+            modifier = Modifier.fillMaxWidth().padding(24.dp).navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Schedule Presentation", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
-            Spacer(modifier = Modifier.height(8.dp))
+            Text("Schedule Next Session", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
             Text("For paper: $bibcode", style = MaterialTheme.typography.bodyMedium)
-            Spacer(modifier = Modifier.height(24.dp))
-            
+
+            DatePicker(
+                state = datePickerState,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Text("Session time", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            TimePicker(
+                state = timePickerState,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+
             Button(
-                onClick = { onSchedule(LocalDateTime.now().plusDays(1)) },
+                onClick = {
+                    val selectedDateMillis = datePickerState.selectedDateMillis ?: System.currentTimeMillis()
+                    val selectedDate = java.time.Instant.ofEpochMilli(selectedDateMillis)
+                        .atZone(java.time.ZoneId.systemDefault())
+                        .toLocalDate()
+                    val selectedDateTime = LocalDateTime.of(
+                        selectedDate,
+                        java.time.LocalTime.of(timePickerState.hour, timePickerState.minute)
+                    )
+                    onSchedule(selectedDateTime)
+                },
                 modifier = Modifier.fillMaxWidth().height(56.dp)
             ) {
-                Text("Schedule for Tomorrow")
+                Text("Confirm Session")
             }
-            Spacer(modifier = Modifier.height(16.dp))
+
             TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
                 Text("Cancel")
             }
-            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }

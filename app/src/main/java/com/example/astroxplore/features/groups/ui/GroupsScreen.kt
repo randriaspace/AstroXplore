@@ -15,6 +15,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -24,6 +25,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.astroxplore.R
 import com.example.astroxplore.core.ui.components.LottieLoadingView
 import com.example.astroxplore.core.ui.components.OfflineFallbackState
+import com.example.astroxplore.features.groups.data.GroupRepository
 import com.example.astroxplore.features.groups.model.GroupModel
 import kotlinx.coroutines.flow.collectLatest
 
@@ -272,22 +274,41 @@ fun JoinGroupDialog(
     onJoin: (String) -> Unit
 ) {
     var id by remember { mutableStateOf("") }
+    val clipboardManager = LocalClipboardManager.current
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Join Journal Club", fontWeight = FontWeight.Bold) },
         text = {
-            OutlinedTextField(
-                value = id,
-                onValueChange = { id = it.uppercase() },
-                label = { Text("Public club code or private invite token") },
-                placeholder = { Text("8-character code or 64-character token") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-                singleLine = true
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Paste a QR-scanned invite code or public club code.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = id,
+                    onValueChange = { id = GroupRepository.normalizeJoinInput(it) },
+                    label = { Text("Public code or invite token") },
+                    placeholder = { Text("8-character code or 64-character token") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    singleLine = true,
+                    trailingIcon = {
+                        TextButton(onClick = {
+                            val clipboardText = clipboardManager.getText()?.text.orEmpty()
+                            if (clipboardText.isNotBlank()) {
+                                id = GroupRepository.normalizeJoinInput(clipboardText)
+                            }
+                        }) {
+                            Text("Paste")
+                        }
+                    }
+                )
+            }
         },
         confirmButton = {
-            Button(onClick = { onJoin(id) }, enabled = id.length >= 4) {
+            Button(onClick = { onJoin(GroupRepository.normalizeJoinInput(id)) }, enabled = id.length >= 4) {
                 Text("Join")
             }
         },

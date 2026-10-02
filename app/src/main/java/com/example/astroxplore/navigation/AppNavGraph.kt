@@ -202,7 +202,8 @@ fun RootNavHost(
                                 }
                             }
                         },
-                        onNavigateToSignup = { navController.navigate(Screen.Signup) }
+                        onNavigateToSignup = { navController.navigate(Screen.Signup) },
+                        onNavigateBack = { navController.popBackStack() }
                     )
                 }
 

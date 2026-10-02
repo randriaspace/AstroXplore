@@ -31,6 +31,16 @@ class GroupRepository @Inject constructor(
     private val groupDao: GroupDao,
     private val groupPaperDao: GroupPaperDao
 ) {
+    companion object {
+        fun normalizeJoinInput(raw: String): String {
+            return raw
+                .replace("-", "")
+                .replace("_", "")
+                .filterNot { it.isWhitespace() }
+                .uppercase()
+        }
+    }
+
     /**
      * Reactively observe groups from the local database (Offline-First)
      */
@@ -118,7 +128,7 @@ class GroupRepository @Inject constructor(
 
     suspend fun joinGroup(inviteOrDisplayId: String): Boolean = withContext(Dispatchers.IO) {
         val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return@withContext false
-        val input = inviteOrDisplayId.filterNot(Char::isWhitespace)
+        val input = normalizeJoinInput(inviteOrDisplayId)
         try {
             val group = if (input.matches(Regex("^[0-9a-fA-F]{64}$"))) {
                 val groupId = supabaseClient.postgrest.rpc(
@@ -151,10 +161,12 @@ class GroupRepository @Inject constructor(
     }
 
     suspend fun createGroupInvite(groupId: String): String = withContext(Dispatchers.IO) {
+        val expiresAt = java.time.OffsetDateTime.now().plusDays(7).toString()
         supabaseClient.postgrest.rpc(
             function = "create_group_invite",
             parameters = buildJsonObject {
                 put("p_group_id", groupId)
+                put("p_expires_at", expiresAt)
                 put("p_max_uses", 1)
             }
         ).decodeSingle<String>()
