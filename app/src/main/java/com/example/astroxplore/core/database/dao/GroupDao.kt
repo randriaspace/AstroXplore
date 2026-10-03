@@ -42,6 +42,9 @@ interface GroupDao {
     @Query("SELECT * FROM journal_clubs WHERE isSynced = 0")
     suspend fun getUnsyncedGroups(): List<GroupEntity>
 
+    @Query("UPDATE journal_clubs SET isSynced = :isSynced WHERE id = :groupId")
+    suspend fun updateSyncStatus(groupId: String, isSynced: Boolean)
+
     @Query("SELECT COUNT(*) FROM journal_clubs")
     suspend fun getGroupCount(): Int
 }

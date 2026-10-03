@@ -62,12 +62,19 @@ class GroupsViewModel @Inject constructor(
             groupRepository.initSeedDataIfEmpty()
             syncGroups()
         }
+        viewModelScope.launch {
+            isOnline.collect { online ->
+                if (online) {
+                    groupRepository.syncPendingMutations()
+                }
+            }
+        }
     }
 
     fun syncGroups() {
         viewModelScope.launch {
             _isRefreshing.value = true
-            groupRepository.syncGroups()
+            groupRepository.syncPendingMutations()
             _isRefreshing.value = false
         }
     }
@@ -86,7 +93,7 @@ class GroupsViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                _messages.emit("Couldn't create the club. Check your connection and try again.")
+                _messages.emit("Couldn't create the club. Saved locally.")
             }
         }
     }
@@ -95,6 +102,11 @@ class GroupsViewModel @Inject constructor(
         viewModelScope.launch {
             val success = groupRepository.joinGroup(displayId)
             _joinStatus.emit(success)
+            if (success) {
+                _messages.emit("Joined club successfully!")
+            } else {
+                _messages.emit("Couldn't join club. Please check the club code.")
+            }
         }
     }
 

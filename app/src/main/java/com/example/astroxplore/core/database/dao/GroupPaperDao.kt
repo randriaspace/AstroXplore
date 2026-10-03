@@ -33,6 +33,9 @@ interface GroupPaperDao {
     @Query("SELECT * FROM group_papers WHERE isSynced = 0")
     suspend fun getUnsyncedGroupPapers(): List<GroupPaperEntity>
 
+    @Query("UPDATE group_papers SET isSynced = :isSynced WHERE id = :id")
+    suspend fun updateSyncStatus(id: String, isSynced: Boolean)
+
     @Query("SELECT COUNT(*) FROM group_papers WHERE groupId = :groupId")
     suspend fun getPaperCount(groupId: String): Int
 

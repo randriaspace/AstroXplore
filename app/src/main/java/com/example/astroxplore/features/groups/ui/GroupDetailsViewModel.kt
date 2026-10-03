@@ -59,6 +59,24 @@ class GroupDetailsViewModel @Inject constructor(
 
     val currentUserId get() = authRepository.currentUser?.id ?: "local_user"
 
+    init {
+        viewModelScope.launch {
+            isOnline.collect { online ->
+                if (online) {
+                    val currentId = _currentGroup.value?.id
+                    groupRepository.syncPendingMutations()
+                    if (currentId != null) {
+                        groupRepository.syncGroupPapers(currentId)
+                        groupRepository.syncGroupMembers(currentId)
+                        groupRepository.syncGroupPresentations(currentId)
+                        groupRepository.syncGroupReviews(currentId)
+                        loadKpis(currentId)
+                    }
+                }
+            }
+        }
+    }
+
     fun loadGroupData(groupId: String) {
         viewModelScope.launch {
             _uiState.value = GroupDetailsUiState.Loading
@@ -112,6 +130,27 @@ class GroupDetailsViewModel @Inject constructor(
         // Background sync and KPI compute
         viewModelScope.launch {
             groupRepository.syncGroupPapers(groupId)
+            groupRepository.syncGroupMembers(groupId)
+            groupRepository.syncGroupPresentations(groupId)
+            groupRepository.syncGroupReviews(groupId)
+            loadKpis(groupId)
+        }
+
+        // Live Supabase Realtime channel for instant vote / shelf updates
+        viewModelScope.launch {
+            groupRepository.observeRealtimeGroupUpdates(groupId) {
+                loadKpis(groupId)
+            }
+        }
+    }
+
+    fun refreshGroupData() {
+        val groupId = _currentGroup.value?.id ?: return
+        viewModelScope.launch {
+            groupRepository.syncGroupPapers(groupId)
+            groupRepository.syncGroupMembers(groupId)
+            groupRepository.syncGroupPresentations(groupId)
+            groupRepository.syncGroupReviews(groupId)
             loadKpis(groupId)
         }
     }

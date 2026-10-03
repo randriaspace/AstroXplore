@@ -24,6 +24,12 @@ interface GroupPresentationDao {
     @Query("DELETE FROM group_presentations WHERE groupId = :groupId")
     suspend fun deleteGroupPresentations(groupId: String)
 
+    @Query("SELECT * FROM group_presentations WHERE isSynced = 0")
+    suspend fun getUnsyncedPresentations(): List<GroupPresentationEntity>
+
+    @Query("UPDATE group_presentations SET isSynced = :isSynced WHERE id = :id")
+    suspend fun updateSyncStatus(id: String, isSynced: Boolean)
+
     @Query("SELECT COUNT(*) FROM group_presentations WHERE groupId = :groupId")
     suspend fun getPresentationCount(groupId: String): Int
 }

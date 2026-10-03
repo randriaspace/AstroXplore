@@ -1432,8 +1432,13 @@ ON CONFLICT (name) DO NOTHING;
 -- set_group_member_role(p_group_id, p_user_id, p_new_role)
 -- remove_group_member(p_group_id, p_user_id)
 -- leave_group(p_group_id), archive_group(p_group_id), transfer_group_ownership(...)
--- check_in_session(p_presentation_id), set_group_post_pinned(p_post_id, p_is_pinned)
--- Public clubs may still be joined by inserting the caller's own 'member' row. Private
--- clubs must use an invite token; display_id is not an authorization credential.
+-- Enable Supabase Realtime broadcast for Journal Club tables
+ALTER PUBLICATION supabase_realtime ADD TABLE 
+    groups, 
+    group_members, 
+    group_papers, 
+    group_paper_votes, 
+    group_presentations, 
+    group_session_reviews;
 
 COMMIT;

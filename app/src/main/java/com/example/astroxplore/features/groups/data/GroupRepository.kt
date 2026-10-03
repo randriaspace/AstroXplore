@@ -8,11 +8,15 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.rpc
+import io.github.jan.supabase.realtime.PostgresAction
+import io.github.jan.supabase.realtime.channel
+import io.github.jan.supabase.realtime.postgresChangeFlow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -103,27 +107,36 @@ class GroupRepository @Inject constructor(
         initSeedDataIfEmpty()
         val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return@withContext
         try {
+            // 1. Fetch user memberships
             val memberships = supabaseClient.postgrest["group_members"]
                 .select(columns = Columns.ALL) {
                     filter { eq("user_id", userId) }
                 }
                 .decodeList<GroupMemberModel>()
             
-            val groupIds = memberships.map { it.groupId }
-            if (groupIds.isNotEmpty()) {
-                val remoteGroups = supabaseClient.postgrest["groups"]
-                    .select(columns = Columns.ALL) {
-                        filter {
-                            isIn("id", groupIds)
-                            eq("status", "active")
-                        }
+            val memberGroupIds = memberships.map { it.groupId }.toSet()
+            
+            // 2. Fetch all discoverable/public groups
+            val remoteGroups = supabaseClient.postgrest["groups"]
+                .select(columns = Columns.ALL) {
+                    filter {
+                        eq("status", "active")
                     }
-                    .decodeList<GroupModel>()
-                
-                groupDao.insertGroups(remoteGroups.map { it.toEntity(isSynced = true).copy(isMember = true) })
+                }
+                .decodeList<GroupModel>()
+            
+            if (remoteGroups.isNotEmpty()) {
+                val entities = remoteGroups.map { group ->
+                    val isMember = memberGroupIds.contains(group.id) || group.ownerId == userId
+                    group.toEntity(isSynced = true).copy(isMember = isMember)
+                }
+                groupDao.insertGroups(entities)
 
-                remoteGroups.forEach { group ->
+                remoteGroups.filter { memberGroupIds.contains(it.id) || it.ownerId == userId }.forEach { group ->
                     syncGroupPapers(group.id)
+                    syncGroupMembers(group.id)
+                    syncGroupPresentations(group.id)
+                    syncGroupReviews(group.id)
                 }
             }
         } catch (_: Exception) {
@@ -144,6 +157,212 @@ class GroupRepository @Inject constructor(
             }
         } catch (_: Exception) {
             // Keep local cached papers
+        }
+    }
+
+    suspend fun syncGroupMembers(groupId: String) = withContext(Dispatchers.IO) {
+        try {
+            val remoteMembers = supabaseClient.postgrest["group_members"]
+                .select(columns = Columns.ALL) {
+                    filter { eq("group_id", groupId) }
+                }
+                .decodeList<GroupMemberModel>()
+            
+            if (remoteMembers.isNotEmpty()) {
+                groupMemberDao.insertMembers(remoteMembers.map { it.toEntity(isSynced = true) })
+            }
+        } catch (_: Exception) {
+            // Keep local cached members
+        }
+    }
+
+    suspend fun syncGroupPresentations(groupId: String) = withContext(Dispatchers.IO) {
+        try {
+            val remotePresentations = supabaseClient.postgrest["group_presentations"]
+                .select(columns = Columns.ALL) {
+                    filter { eq("group_id", groupId) }
+                }
+                .decodeList<PresentationModel>()
+            
+            if (remotePresentations.isNotEmpty()) {
+                groupPresentationDao.insertPresentations(remotePresentations.map { it.toEntity(isSynced = true) })
+            }
+        } catch (_: Exception) {
+            // Keep local cached presentations
+        }
+    }
+
+    suspend fun syncGroupReviews(groupId: String) = withContext(Dispatchers.IO) {
+        try {
+            val remoteReviews = supabaseClient.postgrest["group_session_reviews"]
+                .select(columns = Columns.ALL) {
+                    filter { eq("group_id", groupId) }
+                }
+                .decodeList<SessionReviewModel>()
+            
+            if (remoteReviews.isNotEmpty()) {
+                groupReviewDao.insertReviews(remoteReviews.map { it.toEntity(isSynced = true) })
+            }
+        } catch (_: Exception) {
+            // Keep local cached reviews
+        }
+    }
+
+    suspend fun syncPendingMutations() = withContext(Dispatchers.IO) {
+        val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return@withContext
+        
+        // 1. Sync pending local groups
+        try {
+            val unsyncedGroups = groupDao.getUnsyncedGroups()
+            for (localGroup in unsyncedGroups) {
+                try {
+                    val rows = supabaseClient.postgrest.rpc(
+                        function = "create_group",
+                        parameters = buildJsonObject {
+                            put("p_name", localGroup.name.trim())
+                            put("p_description", localGroup.description?.let(::JsonPrimitive) ?: JsonNull)
+                            put("p_focus_area", localGroup.focusArea?.let(::JsonPrimitive) ?: JsonNull)
+                            put("p_visibility", "public")
+                        }
+                    ).decodeList<GroupModel>()
+                    val remote = rows.singleOrNull()
+                    if (remote != null) {
+                        groupDao.deleteGroup(localGroup.id)
+                        groupDao.insertGroup(
+                            remote.toEntity(isSynced = true).copy(
+                                isMember = true,
+                                meetingSchedule = localGroup.meetingSchedule,
+                                meetingLocation = localGroup.meetingLocation
+                            )
+                        )
+                    }
+                } catch (_: Exception) {}
+            }
+        } catch (_: Exception) {}
+
+        // 2. Sync pending local papers
+        try {
+            val unsyncedPapers = groupPaperDao.getUnsyncedGroupPapers()
+            for (paper in unsyncedPapers) {
+                try {
+                    val supabaseGroupPaper = mapOf(
+                        "group_id" to paper.groupId,
+                        "bibcode" to paper.bibcode,
+                        "added_by" to (if (paper.addedBy.startsWith("local_")) userId else paper.addedBy)
+                    )
+                    val inserted = supabaseClient.postgrest["group_papers"]
+                        .insert(supabaseGroupPaper) { select() }
+                        .decodeSingleOrNull<GroupPaperModel>()
+                    if (inserted != null) {
+                        groupPaperDao.deleteGroupPaperById(paper.id)
+                        groupPaperDao.insertGroupPaper(
+                            inserted.copy(
+                                title = paper.title,
+                                authors = paper.authors,
+                                year = paper.year,
+                                isVotedByMe = paper.isVotedByMe
+                            ).toEntity(isSynced = true)
+                        )
+                    } else {
+                        groupPaperDao.updateSyncStatus(paper.id, true)
+                    }
+                } catch (_: Exception) {}
+            }
+        } catch (_: Exception) {}
+
+        // 3. Sync pending local presentations
+        try {
+            val unsyncedPresentations = groupPresentationDao.getUnsyncedPresentations()
+            for (pres in unsyncedPresentations) {
+                try {
+                    val inserted = supabaseClient.postgrest["group_presentations"].insert(
+                        mapOf(
+                            "group_id" to pres.groupId,
+                            "bibcode" to pres.bibcode,
+                            "presenter_id" to (if (pres.presenterId.startsWith("local_")) userId else pres.presenterId),
+                            "scheduled_at" to pres.scheduledAt,
+                            "time_zone" to java.time.ZoneId.systemDefault().id
+                        )
+                    ) { select() }.decodeSingleOrNull<PresentationModel>()
+                    if (inserted != null) {
+                        groupPresentationDao.deletePresentation(pres.id)
+                        groupPresentationDao.insertPresentation(
+                            inserted.copy(
+                                paperTitle = pres.paperTitle,
+                                presenterName = pres.presenterName,
+                                meetingLocation = pres.meetingLocation,
+                                isCheckedIn = pres.isCheckedIn
+                            ).toEntity(isSynced = true)
+                        )
+                    } else {
+                        groupPresentationDao.updateSyncStatus(pres.id, true)
+                    }
+                } catch (_: Exception) {}
+            }
+        } catch (_: Exception) {}
+
+        // 4. Sync pending local reviews
+        try {
+            val unsyncedReviews = groupReviewDao.getUnsyncedReviews()
+            for (review in unsyncedReviews) {
+                try {
+                    val inserted = supabaseClient.postgrest["group_session_reviews"].insert(
+                        mapOf(
+                            "group_id" to review.groupId,
+                            "bibcode" to review.bibcode,
+                            "reviewer_id" to (if (review.reviewerId.startsWith("local_")) userId else review.reviewerId),
+                            "notes" to review.notes,
+                            "rating" to review.rating
+                        )
+                    ) { select() }.decodeSingleOrNull<SessionReviewModel>()
+                    if (inserted != null) {
+                        groupReviewDao.deleteReview(review.id)
+                        groupReviewDao.insertReview(
+                            inserted.copy(
+                                paperTitle = review.paperTitle,
+                                reviewerName = review.reviewerName
+                            ).toEntity(isSynced = true)
+                        )
+                    } else {
+                        groupReviewDao.updateSyncStatus(review.id, true)
+                    }
+                } catch (_: Exception) {}
+            }
+        } catch (_: Exception) {}
+        
+        // 5. Run full sync
+        syncGroups()
+    }
+
+    suspend fun observeRealtimeGroupUpdates(groupId: String, onUpdate: suspend () -> Unit) = withContext(Dispatchers.IO) {
+        try {
+            val channel = supabaseClient.channel("group_realtime_$groupId")
+            val papersFlow = channel.postgresChangeFlow<PostgresAction>(schema = "public") {
+                table = "group_papers"
+            }
+            val votesFlow = channel.postgresChangeFlow<PostgresAction>(schema = "public") {
+                table = "group_paper_votes"
+            }
+            channel.subscribe()
+            
+            kotlinx.coroutines.coroutineScope {
+                launch {
+                    papersFlow.collect {
+                        syncGroupPapers(groupId)
+                        onUpdate()
+                    }
+                }
+                launch {
+                    votesFlow.collect {
+                        syncGroupPapers(groupId)
+                        onUpdate()
+                    }
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Room cache acts as offline source of truth
         }
     }
 
@@ -382,8 +601,18 @@ class GroupRepository @Inject constructor(
                 "bibcode" to bibcode,
                 "added_by" to userId
             )
-            supabaseClient.postgrest["group_papers"]
+            val inserted = supabaseClient.postgrest["group_papers"]
                 .insert(supabaseGroupPaper) { select() }
+                .decodeSingleOrNull<GroupPaperModel>()
+            if (inserted != null) {
+                groupPaperDao.deleteGroupPaperById(localId)
+                groupPaperDao.insertGroupPaper(
+                    inserted.copy(title = title, authors = authors, year = year, isVotedByMe = true)
+                        .toEntity(isSynced = true)
+                )
+            } else {
+                groupPaperDao.updateSyncStatus(localId, true)
+            }
         } catch (_: Exception) {}
     }
 
@@ -417,8 +646,9 @@ class GroupRepository @Inject constructor(
         location: String = "Virtual Seminar Room"
     ) = withContext(Dispatchers.IO) {
         val userId = supabaseClient.auth.currentUserOrNull()?.id ?: "local_user"
+        val localId = UUID.randomUUID().toString()
         val presentation = PresentationModel(
-            id = UUID.randomUUID().toString(),
+            id = localId,
             groupId = groupId,
             bibcode = bibcode,
             paperTitle = paperTitle,
@@ -433,7 +663,7 @@ class GroupRepository @Inject constructor(
         groupPresentationDao.insertPresentation(presentation.toEntity(isSynced = false))
 
         try {
-            supabaseClient.postgrest["group_presentations"].insert(
+            val inserted = supabaseClient.postgrest["group_presentations"].insert(
                 mapOf(
                     "group_id" to groupId,
                     "bibcode" to bibcode,
@@ -441,7 +671,20 @@ class GroupRepository @Inject constructor(
                     "scheduled_at" to dateTime.toString(),
                     "time_zone" to java.time.ZoneId.systemDefault().id
                 )
-            )
+            ) { select() }.decodeSingleOrNull<PresentationModel>()
+            if (inserted != null) {
+                groupPresentationDao.deletePresentation(localId)
+                groupPresentationDao.insertPresentation(
+                    inserted.copy(
+                        paperTitle = paperTitle,
+                        presenterName = "You (Presenter)",
+                        meetingLocation = location,
+                        isCheckedIn = true
+                    ).toEntity(isSynced = true)
+                )
+            } else {
+                groupPresentationDao.updateSyncStatus(localId, true)
+            }
         } catch (_: Exception) {}
     }
 
@@ -463,8 +706,9 @@ class GroupRepository @Inject constructor(
         rating: Int
     ) = withContext(Dispatchers.IO) {
         val userId = supabaseClient.auth.currentUserOrNull()?.id ?: "local_user"
+        val localId = UUID.randomUUID().toString()
         val review = SessionReviewModel(
-            id = UUID.randomUUID().toString(),
+            id = localId,
             groupId = groupId,
             bibcode = bibcode,
             paperTitle = paperTitle,
@@ -477,7 +721,7 @@ class GroupRepository @Inject constructor(
         groupReviewDao.insertReview(review.toEntity(isSynced = false))
 
         try {
-            supabaseClient.postgrest["group_session_reviews"].insert(
+            val inserted = supabaseClient.postgrest["group_session_reviews"].insert(
                 mapOf(
                     "group_id" to groupId,
                     "bibcode" to bibcode,
@@ -485,7 +729,18 @@ class GroupRepository @Inject constructor(
                     "notes" to notes,
                     "rating" to rating
                 )
-            )
+            ) { select() }.decodeSingleOrNull<SessionReviewModel>()
+            if (inserted != null) {
+                groupReviewDao.deleteReview(localId)
+                groupReviewDao.insertReview(
+                    inserted.copy(
+                        paperTitle = paperTitle,
+                        reviewerName = "You"
+                    ).toEntity(isSynced = true)
+                )
+            } else {
+                groupReviewDao.updateSyncStatus(localId, true)
+            }
         } catch (_: Exception) {}
     }
 
