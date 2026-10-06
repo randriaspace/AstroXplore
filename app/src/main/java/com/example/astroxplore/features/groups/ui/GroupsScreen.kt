@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.astroxplore.R
+import com.example.astroxplore.features.groups.ui.components.QrCodeScannerSheet
 import com.example.astroxplore.core.ui.components.LottieLoadingView
 import com.example.astroxplore.features.groups.model.GroupModel
 import kotlinx.coroutines.flow.collectLatest
@@ -45,6 +46,7 @@ fun GroupsScreen(
     var selectedTab by remember { mutableIntStateOf(0) } // 0: My Clubs, 1: Explore Clubs
     var showCreateSheet by remember { mutableStateOf(false) }
     var showJoinDialog by remember { mutableStateOf(false) }
+    var showQrScanner by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
@@ -63,6 +65,16 @@ fun GroupsScreen(
         }
     }
 
+    if (showQrScanner) {
+        QrCodeScannerSheet(
+            onDismiss = { showQrScanner = false },
+            onCodeScanned = { code ->
+                showQrScanner = false
+                viewModel.joinGroup(code)
+            }
+        )
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -78,6 +90,9 @@ fun GroupsScreen(
                     },
                     windowInsets = WindowInsets(0.dp),
                     actions = {
+                        IconButton(onClick = { showQrScanner = true }) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan QR Code")
+                        }
                         IconButton(onClick = { showJoinDialog = true }) {
                             Icon(Icons.Outlined.GroupAdd, contentDescription = "Join Club by Code")
                         }
@@ -238,6 +253,10 @@ fun GroupsScreen(
     if (showJoinDialog) {
         JoinClubDialog(
             onDismiss = { showJoinDialog = false },
+            onScanQr = {
+                showJoinDialog = false
+                showQrScanner = true
+            },
             onJoin = { code ->
                 viewModel.joinGroup(code)
                 showJoinDialog = false
@@ -588,6 +607,7 @@ fun CreateClubSheet(
 @Composable
 fun JoinClubDialog(
     onDismiss: () -> Unit,
+    onScanQr: () -> Unit = {},
     onJoin: (String) -> Unit
 ) {
     var codeInput by remember { mutableStateOf("") }
@@ -598,8 +618,18 @@ fun JoinClubDialog(
         title = { Text("Join a Journal Club", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(
+                    onClick = onScanQr,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Scan Club QR Code", fontWeight = FontWeight.Bold)
+                }
+
                 Text(
-                    "Enter a club code (e.g. JWST01) or a 64-character invite token from an admin.",
+                    "Or enter a club code (e.g. JWST01) or invite token:",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 OutlinedTextField(

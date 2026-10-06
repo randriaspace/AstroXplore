@@ -57,6 +57,7 @@ fun GroupDetailsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val group by viewModel.currentGroup.collectAsState()
     val members by viewModel.members.collectAsState()
+    val pendingRequests by viewModel.pendingRequests.collectAsState()
     val presentations by viewModel.presentations.collectAsState()
     val sessionReviews by viewModel.sessionReviews.collectAsState()
     val kpiStats by viewModel.kpiStats.collectAsState()
@@ -255,6 +256,9 @@ fun GroupDetailsScreen(
                     currentUserId = currentUserId,
                     currentUserRole = currentUserRole,
                     members = members,
+                    pendingRequests = pendingRequests,
+                    onApproveJoinRequest = { reqId, userId -> viewModel.approveJoinRequest(reqId, userId) },
+                    onDeclineJoinRequest = { reqId -> viewModel.declineJoinRequest(reqId) },
                     onLeave = { 
                         viewModel.leaveGroup()
                         onNavigateBack()
@@ -1024,6 +1028,9 @@ fun AdminTab(
     currentUserId: String?,
     currentUserRole: String,
     members: List<GroupMemberModel>,
+    pendingRequests: List<GroupJoinRequestModel> = emptyList(),
+    onApproveJoinRequest: (String, String) -> Unit = { _, _ -> },
+    onDeclineJoinRequest: (String) -> Unit = {},
     onLeave: () -> Unit,
     onDelete: () -> Unit,
     onKick: (String) -> Unit,
@@ -1092,6 +1099,20 @@ fun AdminTab(
                         }
                     }
                 }
+            }
+        }
+
+        if (isAdmin && pendingRequests.isNotEmpty()) {
+            item {
+                Text("Pending Join Requests (${pendingRequests.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.tertiary)
+            }
+
+            items(pendingRequests) { request ->
+                PendingRequestItem(
+                    request = request,
+                    onApprove = { onApproveJoinRequest(request.id ?: "", request.userId) },
+                    onDecline = { onDeclineJoinRequest(request.id ?: "") }
+                )
             }
         }
 
@@ -1170,6 +1191,59 @@ fun AdminTab(
                     Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Leave Journal Club")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PendingRequestItem(
+    request: GroupJoinRequestModel,
+    onApprove: () -> Unit,
+    onDecline: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f))
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.HourglassTop,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = request.userName ?: "Applicant Scholar",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = "Requested to join",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                IconButton(onClick = onApprove) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = "Accept", tint = MaterialTheme.colorScheme.primary)
+                }
+                IconButton(onClick = onDecline) {
+                    Icon(Icons.Default.Cancel, contentDescription = "Decline", tint = MaterialTheme.colorScheme.error)
                 }
             }
         }

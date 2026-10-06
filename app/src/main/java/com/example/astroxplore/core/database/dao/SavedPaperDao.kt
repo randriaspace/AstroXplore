@@ -20,4 +20,10 @@ interface SavedPaperDao {
 
     @Query("SELECT * FROM saved_papers WHERE isSynced = 0")
     suspend fun getUnsyncedPapers(): List<SavedPaperEntity>
+
+    @Query("SELECT COUNT(*) FROM saved_papers")
+    fun getSavedPaperCount(): Flow<Int>
+
+    @Query("SELECT COALESCE(SUM(citationCount), 0) FROM saved_papers")
+    fun getTotalCitationsTracked(): Flow<Int>
 }

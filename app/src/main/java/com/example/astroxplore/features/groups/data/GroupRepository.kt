@@ -36,7 +36,8 @@ class GroupRepository @Inject constructor(
     private val groupPaperDao: GroupPaperDao,
     private val groupPresentationDao: GroupPresentationDao,
     private val groupReviewDao: GroupReviewDao,
-    private val groupMemberDao: GroupMemberDao
+    private val groupMemberDao: GroupMemberDao,
+    private val groupJoinRequestDao: GroupJoinRequestDao
 ) {
     companion object {
         fun normalizeJoinInput(raw: String): String {
@@ -48,19 +49,14 @@ class GroupRepository @Inject constructor(
         }
     }
 
-    suspend fun initSeedDataIfEmpty() = withContext(Dispatchers.IO) {
-        val count = groupDao.getGroupCount()
-        if (count == 0) {
-            seedDefaultClubs()
-        }
-    }
-
     /**
      * Reactively observe joined clubs from the local Room database (Offline-First)
      */
     fun getMyGroups(): Flow<List<GroupModel>> = groupDao.getMyGroups().map { entities ->
         entities.map { it.toDomainModel() }
     }
+
+    fun getMyGroupCount(): Flow<Int> = groupDao.getMyGroupCount()
 
     /**
      * Reactively observe discoverable public clubs from the local database
@@ -104,19 +100,16 @@ class GroupRepository @Inject constructor(
         }
 
     suspend fun syncGroups() = withContext(Dispatchers.IO) {
-        initSeedDataIfEmpty()
         val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return@withContext
         try {
-            // 1. Fetch user memberships
             val memberships = supabaseClient.postgrest["group_members"]
                 .select(columns = Columns.ALL) {
                     filter { eq("user_id", userId) }
                 }
                 .decodeList<GroupMemberModel>()
-            
+
             val memberGroupIds = memberships.map { it.groupId }.toSet()
-            
-            // 2. Fetch all discoverable/public groups
+
             val remoteGroups = supabaseClient.postgrest["groups"]
                 .select(columns = Columns.ALL) {
                     filter {
@@ -124,7 +117,8 @@ class GroupRepository @Inject constructor(
                     }
                 }
                 .decodeList<GroupModel>()
-            
+
+            groupDao.deleteAllSyncedGroups()
             if (remoteGroups.isNotEmpty()) {
                 val entities = remoteGroups.map { group ->
                     val isMember = memberGroupIds.contains(group.id) || group.ownerId == userId
@@ -370,10 +364,11 @@ class GroupRepository @Inject constructor(
         name: String,
         description: String?,
         focusArea: String?,
-        schedule: String = "Weekly on Thursdays",
-        location: String = "Google Meet / Seminar Room"
+        schedule: String = "",
+        location: String = ""
     ): GroupModel = withContext(Dispatchers.IO) {
-        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: "local_user_${UUID.randomUUID().toString().take(6)}"
+        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
+            ?: throw IllegalStateException("Sign in to create a journal club.")
         val localId = UUID.randomUUID().toString()
         val displayId = "ASTRO" + UUID.randomUUID().toString().filter { it.isLetterOrDigit() }.take(5).uppercase()
         val createdAt = LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME)
@@ -517,6 +512,96 @@ class GroupRepository @Inject constructor(
             // Generate clean offline invite token
             val group = groupDao.getGroupById(groupId)
             "ASTRO-${group?.displayId ?: groupId.take(6).uppercase()}-INVITE"
+        }
+    }
+
+    fun getPendingJoinRequestsFlow(groupId: String): Flow<List<GroupJoinRequestModel>> =
+        groupJoinRequestDao.getPendingRequestsForGroup(groupId).map { entities ->
+            entities.map { it.toDomainModel() }
+        }
+
+    suspend fun syncPendingJoinRequests(groupId: String) = withContext(Dispatchers.IO) {
+        try {
+            val remoteRequests = supabaseClient.postgrest["group_join_requests"]
+                .select(columns = Columns.ALL) {
+                    filter {
+                        eq("group_id", groupId)
+                        eq("status", "pending")
+                    }
+                }
+                .decodeList<GroupJoinRequestModel>()
+
+            if (remoteRequests.isNotEmpty()) {
+                groupJoinRequestDao.insertRequests(remoteRequests.map { it.toEntity(isSynced = true) })
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+        }
+    }
+
+    suspend fun submitJoinRequest(groupId: String): Boolean = withContext(Dispatchers.IO) {
+        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: "local_user"
+        val request = GroupJoinRequestModel(
+            id = UUID.randomUUID().toString(),
+            groupId = groupId,
+            userId = currentUserId,
+            status = "pending",
+            createdAt = LocalDateTime.now().toString(),
+            userName = "You"
+        )
+        groupJoinRequestDao.insertRequest(request.toEntity(isSynced = false))
+
+        try {
+            supabaseClient.postgrest.rpc(
+                function = "submit_group_join_request",
+                parameters = buildJsonObject { put("p_group_id", groupId) }
+            )
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            true
+        }
+    }
+
+    suspend fun approveJoinRequest(requestId: String, groupId: String, applicantUserId: String): Boolean = withContext(Dispatchers.IO) {
+        groupJoinRequestDao.updateRequestStatus(requestId, "accepted")
+        val newMember = GroupMemberModel(
+            id = UUID.randomUUID().toString(),
+            groupId = groupId,
+            userId = applicantUserId,
+            userName = "Scholar",
+            role = "member",
+            joinedAt = LocalDateTime.now().toString()
+        )
+        groupMemberDao.insertMember(newMember.toEntity(isSynced = true))
+
+        try {
+            supabaseClient.postgrest.rpc(
+                function = "approve_group_join_request",
+                parameters = buildJsonObject { put("p_request_id", requestId) }
+            )
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            true
+        }
+    }
+
+    suspend fun declineJoinRequest(requestId: String): Boolean = withContext(Dispatchers.IO) {
+        groupJoinRequestDao.updateRequestStatus(requestId, "rejected")
+        try {
+            supabaseClient.postgrest.rpc(
+                function = "decline_group_join_request",
+                parameters = buildJsonObject { put("p_request_id", requestId) }
+            )
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            true
         }
     }
 
@@ -787,207 +872,5 @@ class GroupRepository @Inject constructor(
             participationScore = (75 + (reviewCount * 5) + (totalVotes * 2)).coerceIn(50, 99),
             meetingStreak = (presentations + reviewCount).coerceAtLeast(1)
         )
-    }
-
-    private suspend fun seedDefaultClubs() {
-        val now = LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME)
-        val nextWeek = LocalDateTime.now().plusDays(4).withHour(17).withMinute(0).withSecond(0).toString()
-        val nextTuesday = LocalDateTime.now().plusDays(2).withHour(15).withMinute(30).withSecond(0).toString()
-
-        // 1. JWST Early Universe Club (Joined)
-        val jwstGroup = GroupEntity(
-            id = "jwst-early-univ",
-            displayId = "JWST01",
-            name = "JWST Early Universe & High-z Galaxies",
-            description = "Analyzing the newest spectroscopic confirmations of z > 10 galaxies, Lyman-break candidates, and early supermassive black hole seeds from NIRCam and NIRSpec.",
-            ownerId = "dr_rostova",
-            focusArea = "High-z Galaxies & First Stars",
-            memberCount = 18,
-            createdAt = now,
-            meetingSchedule = "Thursdays at 17:00 UTC",
-            meetingLocation = "Google Meet: meet.google.com/ast-jwst-01",
-            isMember = true,
-            isSynced = true
-        )
-
-        // 2. Exoplanet Atmospheres Club (Joined)
-        val exoGroup = GroupEntity(
-            id = "exoplanet-atm",
-            displayId = "EXOATM02",
-            name = "Exoplanetary Atmospheres & Habitability",
-            description = "Transmission spectroscopy, secondary eclipses, and photochemical modeling of temperate Earth-sized exoplanets orbiting nearby M-dwarf stars.",
-            ownerId = "dr_tanaka",
-            focusArea = "Transmission Spectroscopy & Biosignatures",
-            memberCount = 24,
-            createdAt = now,
-            meetingSchedule = "Tuesdays at 15:30 UTC",
-            meetingLocation = "Astrophysics Seminar Room 402 & Zoom",
-            isMember = true,
-            isSynced = true
-        )
-
-        // 3. Multi-Messenger Gravitational Astronomy (Explore)
-        val gwGroup = GroupEntity(
-            id = "multi-messenger-gw",
-            displayId = "GWASTRO03",
-            name = "Multi-Messenger Gravitational Astrophysics",
-            description = "Investigating compact binary coalescences, prompt electromagnetic counterparts, r-process nucleosynthesis, and neutron star equation of state.",
-            ownerId = "prof_thorne",
-            focusArea = "Gravitational Waves & Kilonovae",
-            memberCount = 31,
-            createdAt = now,
-            meetingSchedule = "Fridays at 14:00 UTC",
-            meetingLocation = "Physics Hall Auditorium B",
-            isMember = false,
-            isSynced = true
-        )
-
-        // 4. Fast Radio Bursts & Magnetars (Explore)
-        val frbGroup = GroupEntity(
-            id = "frb-magnetars",
-            displayId = "FRBMAG04",
-            name = "Fast Radio Bursts & Magnetars",
-            description = "Exploring periodic repeaters, galactic magnetar bursts, and extragalactic dispersion measure as cosmological probes.",
-            ownerId = "dr_patel",
-            focusArea = "Transient High-Energy Radio",
-            memberCount = 14,
-            createdAt = now,
-            meetingSchedule = "Mondays at 16:00 UTC",
-            meetingLocation = "Virtual: Zoom ID 849-204-118",
-            isMember = false,
-            isSynced = true
-        )
-
-        groupDao.insertGroups(listOf(jwstGroup, exoGroup, gwGroup, frbGroup))
-
-        // Pre-seed papers for JWST
-        val jwstPapers = listOf(
-            GroupPaperEntity(
-                id = "p-jwst-1",
-                groupId = "jwst-early-univ",
-                bibcode = "2023Natur.616...45C",
-                addedBy = "dr_rostova",
-                voteCount = 9,
-                isVotedByMe = true,
-                addedAt = now,
-                title = "A population of pristine candidate galaxies at z ~ 11–13 discovered by JWST",
-                authors = "Curtis-Lake, E., Robertson, B. et al.",
-                year = "2023"
-            ),
-            GroupPaperEntity(
-                id = "p-jwst-2",
-                groupId = "jwst-early-univ",
-                bibcode = "2024ApJ...960...12W",
-                addedBy = "dr_patel",
-                voteCount = 6,
-                isVotedByMe = false,
-                addedAt = now,
-                title = "Spectroscopic verification of extreme emission line galaxies at cosmic dawn",
-                authors = "Williams, H., Oesch, P. et al.",
-                year = "2024"
-            ),
-            GroupPaperEntity(
-                id = "p-jwst-3",
-                groupId = "jwst-early-univ",
-                bibcode = "2024MNRAS.527.1234F",
-                addedBy = "prof_thorne",
-                voteCount = 4,
-                isVotedByMe = false,
-                addedAt = now,
-                title = "Supermassive black hole seeds forming in overdense halos at z > 15",
-                authors = "Furtak, L., Zitrin, A. et al.",
-                year = "2024"
-            )
-        )
-        groupPaperDao.insertGroupPapers(jwstPapers)
-
-        // Pre-seed presentations for JWST
-        val jwstPres = GroupPresentationEntity(
-            id = "pres-jwst-1",
-            groupId = "jwst-early-univ",
-            bibcode = "2023Natur.616...45C",
-            paperTitle = "A population of pristine candidate galaxies at z ~ 11–13 discovered by JWST",
-            presenterId = "dr_rostova",
-            presenterName = "Dr. Elena Rostova",
-            scheduledAt = nextWeek,
-            meetingLocation = "Google Meet: meet.google.com/ast-jwst-01",
-            attendeeCount = 7,
-            isCheckedIn = false,
-            createdAt = now
-        )
-        groupPresentationDao.insertPresentation(jwstPres)
-
-        // Pre-seed reviews for JWST
-        val jwstReview = GroupReviewEntity(
-            id = "rev-jwst-1",
-            groupId = "jwst-early-univ",
-            bibcode = "2023Natur.616...45C",
-            paperTitle = "A population of pristine candidate galaxies at z ~ 11–13 discovered by JWST",
-            reviewerId = "dr_rostova",
-            reviewerName = "Dr. Elena Rostova",
-            notes = "Key discussion outcome: The observed ultraviolet luminosity density at z > 10 requires either an unexpectedly high star formation efficiency or a top-heavy stellar Initial Mass Function (IMF). Next step is cross-checking with ALMA [O III] 88μm line upper limits.",
-            rating = 5,
-            createdAt = "Yesterday"
-        )
-        groupReviewDao.insertReview(jwstReview)
-
-        // Pre-seed members for JWST
-        val jwstMembers = listOf(
-            GroupMemberEntity(id = "m-1", groupId = "jwst-early-univ", userId = "dr_rostova", userName = "Dr. Elena Rostova (Host)", role = "admin", joinedAt = "2 months ago"),
-            GroupMemberEntity(id = "m-2", groupId = "jwst-early-univ", userId = "prof_thorne", userName = "Prof. Marcus Thorne", role = "moderator", joinedAt = "1 month ago"),
-            GroupMemberEntity(id = "m-3", groupId = "jwst-early-univ", userId = "dr_patel", userName = "Dr. Aisha Patel", role = "member", joinedAt = "3 weeks ago"),
-            GroupMemberEntity(id = "m-4", groupId = "jwst-early-univ", userId = "local_user", userName = "You (Fellow)", role = "member", joinedAt = "Today")
-        )
-        groupMemberDao.insertMembers(jwstMembers)
-
-        // Pre-seed papers for Exoplanet Atmospheres
-        val exoPapers = listOf(
-            GroupPaperEntity(
-                id = "p-exo-1",
-                groupId = "exoplanet-atm",
-                bibcode = "2023Natur.622...48M",
-                addedBy = "dr_tanaka",
-                voteCount = 14,
-                isVotedByMe = true,
-                addedAt = now,
-                title = "Carbon-bearing molecules in a possible ocean world exoplanet K2-18b",
-                authors = "Madhusudhan, N., Sarkar, S. et al.",
-                year = "2023"
-            ),
-            GroupPaperEntity(
-                id = "p-exo-2",
-                groupId = "exoplanet-atm",
-                bibcode = "2024ApJ...965...89B",
-                addedBy = "dr_tanaka",
-                voteCount = 8,
-                isVotedByMe = false,
-                addedAt = now,
-                title = "JWST thermal emission constraints on TRAPPIST-1b and TRAPPIST-1c",
-                authors = "Benneke, B., Greene, T. et al.",
-                year = "2024"
-            )
-        )
-        groupPaperDao.insertGroupPapers(exoPapers)
-
-        val exoPres = GroupPresentationEntity(
-            id = "pres-exo-1",
-            groupId = "exoplanet-atm",
-            bibcode = "2023Natur.622...48M",
-            paperTitle = "Carbon-bearing molecules in a possible ocean world exoplanet K2-18b",
-            presenterId = "dr_tanaka",
-            presenterName = "Dr. Kenji Tanaka",
-            scheduledAt = nextTuesday,
-            meetingLocation = "Astrophysics Seminar Room 402 & Zoom",
-            attendeeCount = 12,
-            isCheckedIn = false,
-            createdAt = now
-        )
-        groupPresentationDao.insertPresentation(exoPres)
-
-        val exoMembers = listOf(
-            GroupMemberEntity(id = "m-exo-1", groupId = "exoplanet-atm", userId = "dr_tanaka", userName = "Dr. Kenji Tanaka", role = "admin", joinedAt = "3 months ago"),
-            GroupMemberEntity(id = "m-exo-2", groupId = "exoplanet-atm", userId = "local_user", userName = "You", role = "member", joinedAt = "Today")
-        )
-        groupMemberDao.insertMembers(exoMembers)
     }
 }

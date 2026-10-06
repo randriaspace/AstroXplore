@@ -85,7 +85,6 @@ class OnboardingViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            profileRepository.seedKeywordsIfEmpty()
             profileRepository.syncAvailableKeywords()
         }
     }

@@ -1,5 +1,5 @@
 [versions]
-agp = "9.1.1"
+agp = "9.4.1"
 coreKtx = "1.10.1"
 junit = "4.13.2"
 junitVersion = "1.1.5"
@@ -25,6 +25,7 @@ secretsGradlePlugin = "2.0.1"
 latex = "1.5.0"
 zxing = "3.5.3"
 lottie = "6.6.2"
+camerax = "1.4.1"
 coreSplashScreen = "1.0.1"
 
 [libraries]
@@ -82,6 +83,10 @@ hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-com
 latex-renderer = { module = "io.github.huarangmeng:latex-renderer", version.ref = "latex" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottie" }
+androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
+androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
+androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

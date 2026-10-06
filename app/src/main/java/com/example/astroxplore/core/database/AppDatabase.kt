@@ -17,9 +17,10 @@ import com.example.astroxplore.core.database.entity.*
         PendingPaperDeletionEntity::class,
         GroupPresentationEntity::class,
         GroupReviewEntity::class,
-        GroupMemberEntity::class
+        GroupMemberEntity::class,
+        GroupJoinRequestEntity::class
     ],
-    version = 9,
+    version = 11,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -33,4 +34,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun groupPresentationDao(): GroupPresentationDao
     abstract fun groupReviewDao(): GroupReviewDao
     abstract fun groupMemberDao(): GroupMemberDao
+    abstract fun groupJoinRequestDao(): GroupJoinRequestDao
 }

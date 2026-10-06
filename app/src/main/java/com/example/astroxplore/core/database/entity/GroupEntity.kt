@@ -15,9 +15,9 @@ data class GroupEntity(
     val focusArea: String?,
     val memberCount: Int = 1,
     val createdAt: String?,
-    val meetingSchedule: String? = "Weekly on Thursdays",
-    val meetingLocation: String? = "Google Meet / Seminar Room",
-    val isMember: Boolean = true,
+    val meetingSchedule: String? = null,
+    val meetingLocation: String? = null,
+    val isMember: Boolean = false,
     val isSynced: Boolean = false
 ) {
     fun toDomainModel() = GroupModel(
@@ -29,8 +29,8 @@ data class GroupEntity(
         focusArea = focusArea,
         memberCount = memberCount,
         createdAt = createdAt,
-        meetingSchedule = meetingSchedule ?: "Weekly on Thursdays",
-        meetingLocation = meetingLocation ?: "Google Meet / Seminar Room",
+        meetingSchedule = meetingSchedule.orEmpty(),
+        meetingLocation = meetingLocation.orEmpty(),
         isMember = isMember
     )
 }

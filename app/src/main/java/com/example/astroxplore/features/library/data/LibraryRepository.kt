@@ -45,6 +45,8 @@ class LibraryRepository @Inject constructor(
         entities.map { it.toDomainModel() }
     }
 
+    fun getSavedPaperCount(): Flow<Int> = savedPaperDao.getSavedPaperCount()
+
     fun isPaperSaved(bibcode: String): Flow<Boolean> = savedPaperDao.isPaperSaved(bibcode)
 
     suspend fun toggleSave(paper: PaperModel) = withContext(Dispatchers.IO) {

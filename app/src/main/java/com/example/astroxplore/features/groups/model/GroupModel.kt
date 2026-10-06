@@ -13,9 +13,9 @@ data class GroupModel(
     @SerialName("focus_area") val focusArea: String? = null,
     @SerialName("member_count") val memberCount: Int = 1,
     @SerialName("created_at") val createdAt: String? = null,
-    val meetingSchedule: String = "Weekly on Thursdays",
-    val meetingLocation: String = "Google Meet / Seminar Room",
-    val isMember: Boolean = true
+    @kotlinx.serialization.Transient val meetingSchedule: String = "",
+    @kotlinx.serialization.Transient val meetingLocation: String = "",
+    @kotlinx.serialization.Transient val isMember: Boolean = false
 )
 
 @Serializable

@@ -8,7 +8,6 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
-import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.realtime.Realtime
@@ -35,7 +34,11 @@ object NetworkModule {
     fun provideOkHttpClient(): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
+                level = if (BuildConfig.DEBUG) {
+                    HttpLoggingInterceptor.Level.BASIC
+                } else {
+                    HttpLoggingInterceptor.Level.NONE
+                }
             })
             .addInterceptor { chain ->
                 val request = chain.request()
@@ -66,15 +69,21 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideSupabaseClient(): SupabaseClient {
-        val url = BuildConfig.SUPABASE_URL.ifBlank { "https://placeholder.supabase.co" }
-        val key = BuildConfig.SUPABASE_ANON_KEY.ifBlank { "placeholder-key" }
+        val url = BuildConfig.SUPABASE_URL.trim()
+        val key = BuildConfig.SUPABASE_ANON_KEY.trim()
+        require(url.isNotBlank() && !url.contains("placeholder", ignoreCase = true)) {
+            "Set SUPABASE_URL in .env to your live Supabase project URL."
+        }
+        require(key.isNotBlank() && !key.contains("placeholder", ignoreCase = true)) {
+            "Set SUPABASE_ANON_KEY in .env to your live Supabase publishable or anon key."
+        }
         return createSupabaseClient(
             supabaseUrl = url,
             supabaseKey = key
         ) {
             install(Auth) {
-                // Keep user logged in across restarts
                 alwaysAutoRefresh = true
+                autoLoadFromStorage = true
             }
             install(Postgrest)
             install(Realtime)

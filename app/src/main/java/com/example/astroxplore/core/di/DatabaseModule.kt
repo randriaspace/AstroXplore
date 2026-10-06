@@ -86,4 +86,10 @@ object DatabaseModule {
     fun provideGroupMemberDao(database: AppDatabase): GroupMemberDao {
         return database.groupMemberDao()
     }
+
+    @Provides
+    @Singleton
+    fun provideGroupJoinRequestDao(database: AppDatabase): GroupJoinRequestDao {
+        return database.groupJoinRequestDao()
+    }
 }

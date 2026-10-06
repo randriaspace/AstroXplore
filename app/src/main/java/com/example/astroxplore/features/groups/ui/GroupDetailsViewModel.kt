@@ -39,6 +39,9 @@ class GroupDetailsViewModel @Inject constructor(
     private val _members = MutableStateFlow<List<GroupMemberModel>>(emptyList())
     val members: StateFlow<List<GroupMemberModel>> = _members.asStateFlow()
 
+    private val _pendingRequests = MutableStateFlow<List<GroupJoinRequestModel>>(emptyList())
+    val pendingRequests: StateFlow<List<GroupJoinRequestModel>> = _pendingRequests.asStateFlow()
+
     private val _sessionReviews = MutableStateFlow<List<SessionReviewModel>>(emptyList())
     val sessionReviews: StateFlow<List<SessionReviewModel>> = _sessionReviews.asStateFlow()
 
@@ -125,6 +128,13 @@ class GroupDetailsViewModel @Inject constructor(
                     }
                 }
             }
+
+            // 6. Observe pending join requests
+            launch {
+                groupRepository.getPendingJoinRequestsFlow(groupId).collectLatest { reqList ->
+                    _pendingRequests.value = reqList
+                }
+            }
         }
         
         // Background sync and KPI compute
@@ -185,6 +195,22 @@ class GroupDetailsViewModel @Inject constructor(
             groupRepository.kickMember(groupId, targetUserId)
             _messages.emit("Member removed from club.")
             loadKpis(groupId)
+        }
+    }
+
+    fun approveJoinRequest(requestId: String, applicantUserId: String) {
+        val groupId = _currentGroup.value?.id ?: return
+        viewModelScope.launch {
+            groupRepository.approveJoinRequest(requestId, groupId, applicantUserId)
+            _messages.emit("Join request approved!")
+            loadKpis(groupId)
+        }
+    }
+
+    fun declineJoinRequest(requestId: String) {
+        viewModelScope.launch {
+            groupRepository.declineJoinRequest(requestId)
+            _messages.emit("Join request declined.")
         }
     }
 

@@ -50,14 +50,26 @@ class MainViewModel @Inject constructor(
                 if (status is SessionStatus.Authenticated) {
                     val userId = authRepository.currentUser?.id ?: ""
 
-                    if (isOnline.value) {
+                    // 1. Check local DataStore and local Room DB immediately
+                    val isLocalDataStoreOnboarded = settingsRepository.onboardingComplete.first()
+                    val localProfile = if (userId.isNotBlank()) profileRepository.getLocalProfile(userId).firstOrNull() else null
+                    val isLocallyOnboarded = isLocalDataStoreOnboarded || (localProfile?.isOnboarded == true)
+
+                    // Emit local onboarding status immediately
+                    _isOnboarded.value = isLocallyOnboarded
+
+                    if (isOnline.value && userId.isNotBlank()) {
                         syncAll(userId)
                     }
 
+                    // 2. Perform background check with remote profile
                     val profile = if (userId.isNotBlank()) profileRepository.getProfile(userId) else null
                     val isRemoteOnboarded = profile?.isOnboarded == true
-                    _isOnboarded.value = isRemoteOnboarded
-                    settingsRepository.setOnboardingComplete(isRemoteOnboarded)
+
+                    // Once onboarded, preserve onboarded status locally and remotely
+                    val finalOnboarded = isLocallyOnboarded || isRemoteOnboarded
+                    _isOnboarded.value = finalOnboarded
+                    settingsRepository.setOnboardingComplete(finalOnboarded)
                 } else {
                     _isOnboarded.value = null
                 }

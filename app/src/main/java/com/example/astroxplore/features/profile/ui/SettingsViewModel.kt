@@ -22,6 +22,7 @@ class SettingsViewModel @Inject constructor(
     ) { themeMode, dynamicColor ->
         ProfileUiState(
             themeMode = themeMode,
+            isDynamicColorEnabled = dynamicColor,
             dynamicColorEnabled = dynamicColor
         )
     }.stateIn(

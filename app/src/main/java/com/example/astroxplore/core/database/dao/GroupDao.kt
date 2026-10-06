@@ -47,4 +47,10 @@ interface GroupDao {
 
     @Query("SELECT COUNT(*) FROM journal_clubs")
     suspend fun getGroupCount(): Int
+
+    @Query("SELECT COUNT(*) FROM journal_clubs WHERE isMember = 1")
+    fun getMyGroupCount(): Flow<Int>
+
+    @Query("DELETE FROM journal_clubs WHERE isSynced = 1")
+    suspend fun deleteAllSyncedGroups()
 }

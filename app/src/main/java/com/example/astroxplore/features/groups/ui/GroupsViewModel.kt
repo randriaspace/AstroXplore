@@ -59,7 +59,6 @@ class GroupsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            groupRepository.initSeedDataIfEmpty()
             syncGroups()
         }
         viewModelScope.launch {
@@ -84,7 +83,7 @@ class GroupsViewModel @Inject constructor(
         description: String?,
         focusArea: String?,
         schedule: String = "Weekly on Thursdays",
-        location: String = "Google Meet / Seminar Room"
+        location: String = ""
     ) {
         viewModelScope.launch {
             try {

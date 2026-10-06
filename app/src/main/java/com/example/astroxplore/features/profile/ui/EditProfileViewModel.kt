@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.util.Locale
 import javax.inject.Inject
 
 @HiltViewModel
@@ -20,6 +21,31 @@ class EditProfileViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow<EditProfileUiState>(EditProfileUiState.Loading)
     val uiState = _uiState.asStateFlow()
+
+    val countries = Locale.getISOCountries().map {
+        val locale = Locale.Builder().setRegion(it).build()
+        locale.displayCountry
+    }.sorted()
+
+    val educationLevels = listOf(
+        "High School",
+        "Undergraduate - 1st Year",
+        "Undergraduate - 2nd Year",
+        "Undergraduate - 3rd Year",
+        "Undergraduate - 4th Year",
+        "Master's Degree",
+        "PhD Candidate",
+        "Postdoctoral Researcher",
+        "Professor / Professional Researcher"
+    )
+
+    val affiliationTypes = listOf(
+        "University",
+        "Organization",
+        "Company",
+        "Institution",
+        "Individual"
+    )
 
     init {
         loadProfile()
@@ -39,6 +65,10 @@ class EditProfileViewModel @Inject constructor(
     fun updateProfile(
         firstName: String,
         lastName: String,
+        affiliationType: String,
+        affiliationName: String?,
+        country: String,
+        educationLevel: String,
         institution: String?,
         orcidId: String?
     ) {
@@ -46,8 +76,12 @@ class EditProfileViewModel @Inject constructor(
         val updatedProfile = currentProfile.copy(
             firstName = firstName,
             lastName = lastName,
-            fullName = "$firstName $lastName",
-            institution = institution,
+            fullName = listOf(firstName, lastName).filter { it.isNotBlank() }.joinToString(" "),
+            affiliationType = affiliationType,
+            affiliationName = affiliationName,
+            country = country,
+            educationLevel = educationLevel,
+            institution = institution ?: affiliationName,
             orcidId = orcidId
         )
 
