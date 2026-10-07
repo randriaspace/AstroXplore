@@ -150,7 +150,7 @@ fun RootNavHost(
                     fadeIn(tween(tabTransitionDuration, easing = FastOutSlowInEasing))
                 } else {
                     slideInHorizontally(
-                        initialOffsetX = { -it },
+                        initialOffsetX = { it },
                         animationSpec = screenSlideSpec
                     ) + fadeIn(animationSpec = screenFadeSpec)
                 }
@@ -160,7 +160,7 @@ fun RootNavHost(
                     fadeOut(tween(tabTransitionDuration, easing = FastOutSlowInEasing))
                 } else {
                     slideOutHorizontally(
-                        targetOffsetX = { it },
+                        targetOffsetX = { -it },
                         animationSpec = screenSlideSpec
                     ) + fadeOut(animationSpec = screenFadeSpec)
                 }
@@ -237,7 +237,8 @@ fun RootNavHost(
                     FeedScreen(
                         onSearchClick = { navController.navigate(Screen.Explore(autofocus = true)) },
                         onPaperClick = { bibcode -> navController.navigate(Screen.PaperDetails(bibcode)) },
-                        onLibraryClick = { navController.navigate(Screen.Library) }
+                        onLibraryClick = { navController.navigate(Screen.Library) },
+                        onProfileClick = { navController.navigate(Screen.Profile) }
                     )
                 }
 

@@ -222,28 +222,23 @@ fun PaperCard(
                     }
                 }
 
-                Box {
-                    var expanded by remember { mutableStateOf(false) }
-                    IconButton(onClick = { expanded = true }, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            Icons.Default.MoreHoriz,
-                            contentDescription = "More",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
+                IconButton(
+                    onClick = onMoreClick,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        modifier = Modifier.size(32.dp)
                     ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.add_to_group)) },
-                            leadingIcon = { Icon(Icons.Default.Groups, contentDescription = null) },
-                            onClick = {
-                                expanded = false
-                                onMoreClick()
-                            }
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Add to Journal Club",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }

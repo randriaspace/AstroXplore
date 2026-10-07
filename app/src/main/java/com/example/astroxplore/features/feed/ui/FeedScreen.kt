@@ -69,6 +69,7 @@ fun FeedScreen(
     onSearchClick: () -> Unit = {},
     onPaperClick: (String) -> Unit = {},
     onLibraryClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
 ) {
     val papers by viewModel.feedPapers.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
@@ -142,7 +143,7 @@ fun FeedScreen(
                             BrandingRow(
                                 profile = userProfile,
                                 onNotifClick = {},
-                                onProfileClick = {}
+                                onProfileClick = onProfileClick
                             )
                         }
 
