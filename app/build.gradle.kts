@@ -74,6 +74,7 @@ dependencies {
     implementation(libs.supabase.auth)
     implementation(libs.supabase.realtime)
     implementation(libs.ktor.client.android)
+    implementation(libs.ktor.client.websockets)
 
     // Network
     implementation(libs.retrofit)

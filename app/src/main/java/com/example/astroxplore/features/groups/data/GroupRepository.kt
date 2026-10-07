@@ -426,7 +426,6 @@ class GroupRepository @Inject constructor(
     }
 
     suspend fun joinGroup(inviteOrDisplayId: String): Boolean = withContext(Dispatchers.IO) {
-        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: "local_user"
         val normalized = normalizeJoinInput(inviteOrDisplayId)
 
         // 1. Check local clubs first (matches displayId e.g. "JWST01", "EXOATM02", or ID)
@@ -438,43 +437,21 @@ class GroupRepository @Inject constructor(
         }
 
         if (localMatch != null) {
-            groupDao.updateMembership(localMatch.id, true)
-            val member = GroupMemberModel(
-                id = UUID.randomUUID().toString(),
-                groupId = localMatch.id,
-                userId = currentUserId,
-                userName = "You",
-                role = "member",
-                joinedAt = LocalDateTime.now().toString()
-            )
-            groupMemberDao.insertMember(member.toEntity(isSynced = true))
-            return@withContext true
+            return@withContext submitJoinRequest(localMatch.id)
         }
 
-        // 2. Attempt remote join via Supabase
+        // 2. Lookup remote group by display_id and submit join request for admin approval
         try {
-            val group = if (normalized.matches(Regex("^[0-9a-fA-F]{64}$"))) {
-                val groupId = supabaseClient.postgrest.rpc(
-                    function = "accept_group_invite",
-                    parameters = buildJsonObject { put("p_token", normalized) }
-                ).decodeSingle<String>()
-                fetchGroupById(groupId)
-            } else {
-                val found = supabaseClient.postgrest["groups"]
-                    .select(columns = Columns.ALL) {
-                        filter {
-                            eq("display_id", normalized)
-                            eq("status", "active")
-                        }
+            val found = supabaseClient.postgrest["groups"]
+                .select(columns = Columns.ALL) {
+                    filter {
+                        eq("display_id", normalized)
+                        eq("status", "active")
                     }
-                    .decodeSingle<GroupModel>()
-                supabaseClient.postgrest["group_members"].insert(
-                    mapOf("group_id" to found.id, "user_id" to currentUserId, "role" to "member")
-                )
-                found
-            }
-            groupDao.insertGroup(group.toEntity(isSynced = true).copy(isMember = true))
-            true
+                }
+                .decodeSingle<GroupModel>()
+
+            submitJoinRequest(found.id)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {

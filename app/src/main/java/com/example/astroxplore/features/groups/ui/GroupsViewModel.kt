@@ -102,9 +102,9 @@ class GroupsViewModel @Inject constructor(
             val success = groupRepository.joinGroup(displayId)
             _joinStatus.emit(success)
             if (success) {
-                _messages.emit("Joined club successfully!")
+                _messages.emit("Join request sent to club admin for approval!")
             } else {
-                _messages.emit("Couldn't join club. Please check the club code.")
+                _messages.emit("Couldn't find club with this code. Please check the QR code.")
             }
         }
     }
