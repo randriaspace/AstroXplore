@@ -100,13 +100,6 @@ fun AstroXploreTheme(
             val insetsController = WindowCompat.getInsetsController(window, view)
             insetsController.isAppearanceLightStatusBars = !darkTheme
             insetsController.isAppearanceLightNavigationBars = !darkTheme
-            // Set status bar and navigation bar colors to match theme
-            window.setStatusBarColor(colorScheme.background.copy(alpha = 1f).value.toInt())
-            window.setNavigationBarColor(colorScheme.background.copy(alpha = 1f).value.toInt())
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                window.setNavigationBarContrastEnforced(false)
-                window.setStatusBarContrastEnforced(false)
-            }
         }
     }
 

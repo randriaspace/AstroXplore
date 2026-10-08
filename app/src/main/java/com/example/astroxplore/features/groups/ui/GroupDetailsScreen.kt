@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -27,8 +28,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import android.content.ClipboardManager
+import android.content.ClipData
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -574,7 +576,7 @@ fun ShelfPaperCard(
                     shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                 ) {
-                    Icon(Icons.Default.MenuBook, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Read Abstract", fontSize = 12.sp)
                 }
@@ -598,7 +600,7 @@ fun EmptyShelfCard(onAddClick: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Icon(
-                Icons.Default.MenuBook,
+                Icons.AutoMirrored.Filled.MenuBook,
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
                 tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
@@ -888,7 +890,7 @@ fun ModernPresentationCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onPaperClick) {
-                    Icon(Icons.Default.MenuBook, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Read Preprint", fontSize = 12.sp)
                 }
@@ -983,7 +985,7 @@ fun KpiTab(
             KpiMetricCard(
                 title = "Papers Discussed",
                 value = metrics.totalPapers.toString(),
-                icon = Icons.Default.MenuBook,
+                icon = Icons.AutoMirrored.Filled.MenuBook,
                 modifier = Modifier.weight(1f)
             )
             KpiMetricCard(
@@ -1135,9 +1137,10 @@ fun AdminTab(
                                 fontSize = 16.sp,
                                 color = MaterialTheme.colorScheme.primary
                             )
-                            val clipboardManager = LocalClipboardManager.current
+                            val context = LocalContext.current
                             TextButton(onClick = {
-                                clipboardManager.setText(AnnotatedString(group?.displayId ?: ""))
+                                val clipboard = context.getSystemService(ClipboardManager::class.java)
+                                clipboard?.setPrimaryClip(ClipData.newPlainText("Club Code", group?.displayId ?: ""))
                             }) {
                                 Text("Copy Code", fontSize = 12.sp)
                             }
@@ -1368,7 +1371,6 @@ fun GroupInviteDialog(
     onDismiss: () -> Unit
 ) {
     val qrBitmap = remember(inviteToken) { QrCodeUtils.generateQrCode(inviteToken) }
-    val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
 
     AlertDialog(
@@ -1402,7 +1404,8 @@ fun GroupInviteDialog(
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
-                        clipboardManager.setText(AnnotatedString(displayId))
+                        val clipboard = context.getSystemService(ClipboardManager::class.java)
+                        clipboard?.setPrimaryClip(ClipData.newPlainText("Club Code", displayId))
                     }) {
                         Text("Copy Code")
                     }

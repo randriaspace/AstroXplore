@@ -14,6 +14,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -625,7 +627,7 @@ fun SearchIdleState(
                         label = { Text(keyword) },
                         icon = {
                             Icon(
-                                imageVector = Icons.Outlined.TrendingUp,
+                                imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
                                 contentDescription = null,
                                 modifier = Modifier.size(14.dp),
                                 tint = MaterialTheme.colorScheme.primary
@@ -906,7 +908,7 @@ fun FilterBottomSheet(
                         onValueChange = { currentFilter = currentFilter.copy(bibstem = it) },
                         label = "Journal (Bibstem)",
                         placeholder = "e.g. ApJ, A&A, MNRAS, Nature",
-                        leadingIcon = Icons.Outlined.MenuBook
+                        leadingIcon = Icons.AutoMirrored.Outlined.MenuBook
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
