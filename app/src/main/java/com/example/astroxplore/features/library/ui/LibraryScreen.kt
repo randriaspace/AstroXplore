@@ -21,6 +21,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -30,7 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.astroxplore.core.ui.components.LottieLoadingView
 import com.example.astroxplore.features.feed.model.PaperModel
-import com.example.astroxplore.features.feed.ui.components.PaperCard
+import kotlinx.coroutines.launch
 
 enum class LibraryFilter {
     ALL, REFEREED, OPEN_ACCESS, WITH_DATA
@@ -50,6 +51,11 @@ fun LibraryScreen(
     var isSearchActive by remember { mutableStateOf(false) }
     var selectedFilter by remember { mutableStateOf(LibraryFilter.ALL) }
     var isCompactView by remember { mutableStateOf(false) }
+    
+    // Paper pending confirmation to be removed from archive
+    var paperToConfirmRemove by remember { mutableStateOf<PaperModel?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     // Filter papers based on search query and category tab
     val filteredPapers = remember(papers, searchQuery, selectedFilter) {
@@ -75,6 +81,7 @@ fun LibraryScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column(
                 modifier = Modifier
@@ -85,8 +92,8 @@ fun LibraryScreen(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "Personal Library",
-                                style = MaterialTheme.typography.headlineSmall,
+                                text = "Personal Archive",
+                                style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = (-0.5).sp
                             )
@@ -106,7 +113,6 @@ fun LibraryScreen(
                             }
                         }
                     },
-                    windowInsets = WindowInsets(0.dp),
                     actions = {
                         // In-library Search Toggle
                         IconButton(onClick = {
@@ -378,116 +384,339 @@ fun LibraryScreen(
                         }
                     }
 
-                    if (isCompactView) {
-                        items(filteredPapers, key = { it.bibcode }) { paper ->
-                            CompactPaperItem(
-                                paper = paper,
-                                onPaperClick = { onPaperClick(paper.bibcode) },
-                                onRemoveClick = { viewModel.toggleSave(paper) }
-                            )
-                        }
-                    } else {
-                        items(filteredPapers, key = { it.bibcode }) { paper ->
-                            PaperCard(
-                                paper = paper,
-                                isSaved = true,
-                                onSaveClick = { viewModel.toggleSave(paper) },
-                                onTitleClick = { onPaperClick(paper.bibcode) },
-                                onReadMoreClick = { onPaperClick(paper.bibcode) }
-                            )
-                        }
+                    items(filteredPapers, key = { it.bibcode }) { paper ->
+                        ExpandedLibraryListItem(
+                            paper = paper,
+                            onPaperClick = { onPaperClick(paper.bibcode) },
+                            onRequestRemove = { paperToConfirmRemove = paper },
+                            isCompact = isCompactView
+                        )
                     }
                 }
             }
+        }
+
+        // Confirmation Pop-up Dialog for Removing / Archiving
+        paperToConfirmRemove?.let { paper ->
+            AlertDialog(
+                onDismissRequest = { paperToConfirmRemove = null },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Outlined.DeleteOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                title = {
+                    Text(
+                        text = "Remove from Archive?",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "Are you sure you want to remove this paper from your saved collection?",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = paper.title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (paper.authors.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = paper.authors.first(),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            viewModel.toggleSave(paper)
+                            paperToConfirmRemove = null
+                            scope.launch {
+                                val result = snackbarHostState.showSnackbar(
+                                    message = "Paper removed from archive",
+                                    actionLabel = "Undo",
+                                    duration = SnackbarDuration.Short
+                                )
+                                if (result == SnackbarResult.ActionPerformed) {
+                                    viewModel.toggleSave(paper)
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        ),
+                        shape = RoundedCornerShape(100.dp)
+                    ) {
+                        Text("Remove")
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(
+                        onClick = { paperToConfirmRemove = null },
+                        shape = RoundedCornerShape(100.dp)
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
     }
 }
 
 /**
- * Compact Google Keep / Play Books style paper list item
+ * Message / Email style expanded list item with swipe-to-remove gesture
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CompactPaperItem(
+fun ExpandedLibraryListItem(
     paper: PaperModel,
     onPaperClick: () -> Unit,
-    onRemoveClick: () -> Unit
+    onRequestRemove: () -> Unit,
+    isCompact: Boolean = false,
+    modifier: Modifier = Modifier
 ) {
-    Card(
-        onClick = onPaperClick,
-        modifier = Modifier
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { dismissValue ->
+            if (dismissValue == SwipeToDismissBoxValue.EndToStart || dismissValue == SwipeToDismissBoxValue.StartToEnd) {
+                onRequestRemove()
+                false // Do not dismiss immediately; wait for confirmation popup
+            } else {
+                false
+            }
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 5.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                color = MaterialTheme.colorScheme.primaryContainer,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.size(44.dp)
+            .padding(horizontal = 16.dp, vertical = if (isCompact) 4.dp else 6.dp),
+        backgroundContent = {
+            val direction = dismissState.dismissDirection
+            val alignment = if (direction == SwipeToDismissBoxValue.StartToEnd) Alignment.CenterStart else Alignment.CenterEnd
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(MaterialTheme.colorScheme.errorContainer)
+                    .padding(horizontal = 20.dp),
+                contentAlignment = alignment
             ) {
-                Box(contentAlignment = Alignment.Center) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.MenuBook,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
+                        imageVector = Icons.Outlined.DeleteOutline,
+                        contentDescription = "Remove from archive",
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = "Remove",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
+        }
+    ) {
+        Card(
+            onClick = onPaperClick,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = if (isCompact) 12.dp else 16.dp)
+            ) {
+                // Header row: Academic Monogram Avatar + Authors & Date + Citation badge
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val initialLetter = paper.authors.firstOrNull()?.firstOrNull()?.uppercaseChar()?.toString()
+                        ?: paper.category.firstOrNull()?.uppercaseChar()?.toString()
+                        ?: "A"
 
-            Spacer(modifier = Modifier.width(14.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = CircleShape,
+                        modifier = Modifier.size(if (isCompact) 36.dp else 42.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = initialLetter,
+                                style = if (isCompact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
 
-            Column(modifier = Modifier.weight(1f)) {
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = paper.authors.take(2).joinToString(", ") + if (paper.authors.size > 2) " et al." else "",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = paper.dateDisplay,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        if (paper.citationCount > 0) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "${paper.citationCount} citations • ${paper.category.ifBlank { "Astrophysics" }}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Subject / Paper Title
                 Text(
                     text = paper.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 22.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = if (isCompact) 1 else 2,
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // Expanded Email / Message Body Preview (Abstract snippet)
+                if (!isCompact && paper.abstractText.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = paper.authors.firstOrNull() ?: "Author",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
+                        text = paper.abstractText,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            lineHeight = 20.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                        maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text(
-                        text = " • ${paper.dateDisplay}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = " • ${paper.citationCount} cites",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
-            }
 
-            Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-            IconButton(onClick = onRemoveClick) {
-                Icon(
-                    imageVector = Icons.Filled.Bookmark,
-                    contentDescription = "Remove from library",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp)
-                )
+                // Footer row: Metadata pills and action gesture hint
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f, fill = false)
+                    ) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = paper.category.uppercase().ifBlank { "RESEARCH" },
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        if (!paper.arxivId.isNullOrBlank()) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = "arXiv:${paper.arxivId}",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "Swipe to remove",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        IconButton(
+                            onClick = onRequestRemove,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.DeleteOutline,
+                                contentDescription = "Remove from archive",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
