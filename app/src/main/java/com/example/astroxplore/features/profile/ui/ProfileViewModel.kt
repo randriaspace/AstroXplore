@@ -20,7 +20,7 @@ data class ProfileUiState(
     val activeClubsCount: Int = 0,
     val citationsTracked: Int = 0,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val isDynamicColorEnabled: Boolean = true,
+    val isDynamicColorEnabled: Boolean = false,
     val dynamicColorEnabled: Boolean = isDynamicColorEnabled,
     val adsApiKey: String? = null,
     val cacheSizeMb: String = "0 MB",

@@ -81,7 +81,12 @@ class MainActivity : ComponentActivity() {
             ) {
                 val isOnboarded by mainViewModel.isOnboarded.collectAsState()
                 val navController = rememberNavController()
-                    AstroXploreMain(sessionStatus, isOnboarded, navController)
+                    AstroXploreMain(
+                        sessionStatus = sessionStatus,
+                        isOnboarded = isOnboarded,
+                        navController = navController,
+                        onScrollToTop = { mainViewModel.triggerScrollToTop() }
+                    )
             }
         }
     }
@@ -92,7 +97,8 @@ class MainActivity : ComponentActivity() {
 fun AstroXploreMain(
     sessionStatus: SessionStatus = SessionStatus.Initializing,
     isOnboarded: Boolean? = null,
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    onScrollToTop: () -> Unit = {}
 ) {
     var startupComplete by remember { mutableStateOf(false) }
 
@@ -116,7 +122,8 @@ fun AstroXploreMain(
             RootNavHost(
                 navController = navController,
                 startDestination = startDestination,
-                sessionStatus = sessionStatus
+                sessionStatus = sessionStatus,
+                onScrollToTop = onScrollToTop
             )
         }
 

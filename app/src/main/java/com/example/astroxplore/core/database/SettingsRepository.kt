@@ -40,7 +40,7 @@ class SettingsRepository @Inject constructor(
         .catch { exception ->
             if (exception is IOException) emit(emptyPreferences()) else throw exception
         }.map { preferences ->
-            preferences[PreferencesKeys.DYNAMIC_COLOR] ?: true
+            preferences[PreferencesKeys.DYNAMIC_COLOR] ?: false
         }
 
     val onboardingComplete: Flow<Boolean> = context.dataStore.data

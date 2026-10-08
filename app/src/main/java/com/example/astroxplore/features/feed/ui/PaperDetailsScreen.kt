@@ -3,6 +3,7 @@ package com.example.astroxplore.features.feed.ui
 import android.content.Intent
 import android.content.ClipData
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -55,6 +56,14 @@ fun PaperDetailsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     var showGroupPicker by remember { mutableStateOf(false) }
+
+    BackHandler {
+        if (showGroupPicker) {
+            showGroupPicker = false
+        } else {
+            onNavigateBack()
+        }
+    }
 
     LaunchedEffect(bibcode) {
         viewModel.loadPaper(bibcode)

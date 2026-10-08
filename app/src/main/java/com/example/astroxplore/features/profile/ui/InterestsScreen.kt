@@ -1,5 +1,6 @@
 package com.example.astroxplore.features.profile.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -42,6 +43,8 @@ fun InterestsScreen(
             onPreferencesUpdated()
         }
     }
+
+    BackHandler(onBack = onNavigateBack)
 
     Box(
         modifier = modifier

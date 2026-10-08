@@ -81,8 +81,8 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun AstroXploreTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    // Dynamic color is available on Android 12+ (defaults to false to preserve Twitter Blue theme)
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current

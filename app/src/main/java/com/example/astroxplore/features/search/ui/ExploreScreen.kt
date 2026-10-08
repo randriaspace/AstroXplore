@@ -42,14 +42,14 @@ import com.example.astroxplore.core.ui.components.LottieLoadingView
 import com.example.astroxplore.core.ui.components.OfflineFallbackState
 
 private val QUICK_DISCOVERY_TOPICS = listOf(
-    "🔭 JWST" to "James Webb Space Telescope",
-    "🪐 Exoplanets" to "Exoplanet atmospheres",
-    "🕳️ Black Holes" to "Black hole merger",
-    "🌌 Cosmology" to "Cosmological expansion",
-    "⚡ Gravitational Waves" to "Gravitational wave",
-    "⚛️ Dark Matter" to "Dark matter halo",
-    "✨ Supernovae" to "Supernova remnant",
-    "☄️ Asteroids" to "Near earth asteroids"
+    "JWST" to "James Webb Space Telescope",
+    "Exoplanets" to "Exoplanet atmospheres",
+    "Black Holes" to "Black hole merger",
+    "Cosmology" to "Cosmological expansion",
+    "Gravitational Waves" to "Gravitational wave",
+    "Dark Matter" to "Dark matter halo",
+    "Supernovae" to "Supernova remnant",
+    "Asteroids" to "Near earth asteroids"
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -545,10 +545,10 @@ fun SearchIdleState(
         Spacer(modifier = Modifier.height(12.dp))
 
         val pathways = listOf(
-            Triple("🪐 Exoplanetary Atmospheres", "JWST transmission spectroscopy & biosignatures", "JWST exoplanet atmosphere"),
-            Triple("🔭 Cosmic Dawn & First Stars", "High-redshift galaxy formation at z > 10", "cosmic dawn high redshift galaxies"),
-            Triple("🕳️ Supermassive Black Holes", "Relativistic jets and Event Horizon astrophysics", "supermassive black hole event horizon"),
-            Triple("⚡ Gravitational Wave Astronomy", "Multi-messenger neutron star & compact mergers", "gravitational wave neutron star merger")
+            Triple("Exoplanetary Atmospheres", "JWST transmission spectroscopy & biosignatures", "JWST exoplanet atmosphere"),
+            Triple("Cosmic Dawn & First Stars", "High-redshift galaxy formation at z > 10", "cosmic dawn high redshift galaxies"),
+            Triple("Supermassive Black Holes", "Relativistic jets and Event Horizon astrophysics", "supermassive black hole event horizon"),
+            Triple("Gravitational Wave Astronomy", "Multi-messenger neutron star & compact mergers", "gravitational wave neutron star merger")
         )
 
         Column(

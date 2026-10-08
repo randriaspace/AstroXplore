@@ -56,6 +56,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.compose.NavHost
@@ -112,6 +113,7 @@ fun RootNavHost(
     navController: NavHostController,
     startDestination: Screen,
     sessionStatus: SessionStatus,
+    onScrollToTop: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -137,7 +139,14 @@ fun RootNavHost(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = { if (showBottomNav) BottomNavigationBar(navController = navController) },
+        bottomBar = {
+            if (showBottomNav) {
+                BottomNavigationBar(
+                    navController = navController,
+                    onScrollToTop = onScrollToTop
+                )
+            }
+        },
         modifier = modifier
     ) { innerPadding ->
         NavHost(
@@ -236,17 +245,41 @@ fun RootNavHost(
             navigation<Screen.MainGraph>(startDestination = Screen.Feed) {
                 composable<Screen.Feed> {
                     FeedScreen(
-                        onSearchClick = { navController.navigate(Screen.Explore(autofocus = true)) },
+                        onSearchClick = {
+                            navController.navigate(Screen.Explore(autofocus = true)) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
                         onPaperClick = { bibcode -> navController.navigate(Screen.PaperDetails(bibcode)) },
-                        onLibraryClick = { navController.navigate(Screen.Library) },
-                        onProfileClick = { navController.navigate(Screen.Profile) }
+                        onLibraryClick = {
+                            navController.navigate(Screen.Library) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        onProfileClick = {
+                            navController.navigate(Screen.Profile) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
                     )
                 }
 
                 composable<Screen.Groups> {
                     GroupsScreen(
                         onGroupClick = { groupId -> navController.navigate(Screen.GroupDetails(groupId)) },
-                        onLibraryClick = { navController.navigate(Screen.Library) }
+                        onLibraryClick = {
+                            navController.navigate(Screen.Library) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
                     )
                 }
 
@@ -264,7 +297,13 @@ fun RootNavHost(
                     ExploreScreen(
                         autofocus = route.autofocus,
                         onPaperClick = { bibcode -> navController.navigate(Screen.PaperDetails(bibcode)) },
-                        onLibraryClick = { navController.navigate(Screen.Library) }
+                        onLibraryClick = {
+                            navController.navigate(Screen.Library) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
                     )
                 }
 
@@ -273,7 +312,7 @@ fun RootNavHost(
                         onPaperClick = { bibcode -> navController.navigate(Screen.PaperDetails(bibcode)) },
                         onExploreClick = {
                             navController.navigate(Screen.Explore()) {
-                                popUpTo<Screen.MainGraph> { saveState = true }
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
                             }
@@ -293,8 +332,9 @@ fun RootNavHost(
                         onNavigateBack = { navController.popBackStack() },
                         onPreferencesUpdated = {
                             navController.navigate(Screen.Feed) {
-                                popUpTo<Screen.MainGraph> { inclusive = false }
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
+                                restoreState = true
                             }
                         }
                     )
@@ -322,6 +362,7 @@ fun RootNavHost(
 @Composable
 fun BottomNavigationBar(
     navController: NavController,
+    onScrollToTop: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -378,25 +419,33 @@ fun BottomNavigationBar(
                 },
                 selected = isSelected,
                 onClick = {
-                    val tabOptions: NavOptionsBuilder.() -> Unit = {
-                        popUpTo<Screen.MainGraph> { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                    when (item.route) {
-                        "feed" -> navController.navigate(Screen.Feed, tabOptions)
-                        "groups" -> navController.navigate(Screen.Groups, tabOptions)
-                        "explore" -> navController.navigate(Screen.Explore(), tabOptions)
-                        "library" -> navController.navigate(Screen.Library, tabOptions)
-                        "profile" -> navController.navigate(Screen.Profile, tabOptions)
+                    if (isSelected) {
+                        if (item.route == "feed") {
+                            onScrollToTop()
+                        }
+                    } else {
+                        val tabOptions: NavOptionsBuilder.() -> Unit = {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                        when (item.route) {
+                            "feed" -> navController.navigate(Screen.Feed, tabOptions)
+                            "groups" -> navController.navigate(Screen.Groups, tabOptions)
+                            "explore" -> navController.navigate(Screen.Explore(), tabOptions)
+                            "library" -> navController.navigate(Screen.Library, tabOptions)
+                            "profile" -> navController.navigate(Screen.Profile, tabOptions)
+                        }
                     }
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
                     unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
                 )
             )
         }

@@ -1,6 +1,7 @@
 package com.example.astroxplore.features.groups.ui
 
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Image
@@ -82,6 +83,19 @@ fun GroupDetailsScreen(
     var selectedTitleForSchedule by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val inviteToken by viewModel.inviteToken.collectAsState()
+
+    BackHandler {
+        when {
+            showEditSheet -> showEditSheet = false
+            showAddPaperSheet -> showAddPaperSheet = false
+            showDeleteDialog -> showDeleteDialog = false
+            showScheduleSheet -> showScheduleSheet = false
+            showReviewSheet -> showReviewSheet = false
+            inviteToken != null -> viewModel.dismissInvite()
+            selectedTabIndex != 0 -> selectedTabIndex = 0
+            else -> onNavigateBack()
+        }
+    }
 
     LaunchedEffect(groupId) {
         viewModel.loadGroupData(groupId)

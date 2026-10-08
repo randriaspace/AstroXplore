@@ -173,7 +173,7 @@ fun EnhancedVoteItem(
                     modifier = Modifier.padding(bottom = 8.dp)
                 ) {
                     Text(
-                        text = if (rank == 1) "★ #1 Top Choice" else "#$rank Candidate",
+                        text = if (rank == 1) "#1 Top Choice" else "#$rank Candidate",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = when (rank) {
