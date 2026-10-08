@@ -437,27 +437,37 @@ class GroupRepository @Inject constructor(
         }
 
         if (localMatch != null) {
-            return@withContext submitJoinRequest(localMatch.id)
-        }
-
-        // 2. Lookup remote group by display_id and submit join request for admin approval
-        try {
-            val found = supabaseClient.postgrest["groups"]
-                .select(columns = Columns.ALL) {
-                    filter {
-                        eq("display_id", normalized)
-                        eq("status", "active")
-                    }
+                // Check if club is public - auto join, otherwise submit request
+                if (localMatch.visibility == "public") {
+                    return@withContext joinPublicClub(localMatch.id)
+                } else {
+                    return@withContext submitJoinRequest(localMatch.id)
                 }
-                .decodeSingle<GroupModel>()
+            }
 
-            submitJoinRequest(found.id)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            false
+            // 2. Lookup remote group by display_id
+            try {
+                val found = supabaseClient.postgrest["groups"]
+                    .select(columns = Columns.ALL) {
+                        filter {
+                            eq("display_id", normalized)
+                            eq("status", "active")
+                        }
+                    }
+                    .decodeSingle<GroupModel>()
+
+                // Check visibility and act accordingly
+                if (found.visibility == "public") {
+                    return@withContext joinPublicClub(found.id)
+                } else {
+                    return@withContext submitJoinRequest(found.id)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                false
+            }
         }
-    }
 
     suspend fun joinPublicClub(groupId: String): Boolean = withContext(Dispatchers.IO) {
         val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: "local_user"
@@ -571,7 +581,7 @@ class GroupRepository @Inject constructor(
         groupJoinRequestDao.updateRequestStatus(requestId, "rejected")
         try {
             supabaseClient.postgrest.rpc(
-                function = "decline_group_join_request",
+                function = "reject_group_join_request",
                 parameters = buildJsonObject { put("p_request_id", requestId) }
             )
             true

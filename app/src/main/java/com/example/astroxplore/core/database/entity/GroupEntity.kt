@@ -15,6 +15,7 @@ data class GroupEntity(
     val focusArea: String?,
     val memberCount: Int = 1,
     val createdAt: String?,
+    val visibility: String = "private", // "public" or "private"
     val meetingSchedule: String? = null,
     val meetingLocation: String? = null,
     val isMember: Boolean = false,
@@ -29,6 +30,7 @@ data class GroupEntity(
         focusArea = focusArea,
         memberCount = memberCount,
         createdAt = createdAt,
+        visibility = visibility,
         meetingSchedule = meetingSchedule.orEmpty(),
         meetingLocation = meetingLocation.orEmpty(),
         isMember = isMember
@@ -44,6 +46,7 @@ fun GroupModel.toEntity(isSynced: Boolean = false) = GroupEntity(
     focusArea = focusArea,
     memberCount = memberCount,
     createdAt = createdAt,
+    visibility = visibility,
     meetingSchedule = meetingSchedule,
     meetingLocation = meetingLocation,
     isMember = isMember,
