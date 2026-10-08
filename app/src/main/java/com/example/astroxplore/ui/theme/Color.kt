@@ -2,12 +2,12 @@ package com.example.astroxplore.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Default AstroXplore (Blue/Twitter-like) Palette
-val AstroBlue = Color(0xFF1DA1F2)
-val AstroBlueDark = Color(0xFF004A77)
-val AstroBlueLight = Color(0xFF9ECAFF)
+// Modern Google Material 3 Palette (Google Indigo / Dynamic Blue & Cosmic Teal)
+val AstroBlue = Color(0xFF0B57D0)
+val AstroBlueDark = Color(0xFF0842A0)
+val AstroBlueLight = Color(0xFFA8C7FA)
 
-// Slate Palette from Flutter
+// Slate Palette Compatibility
 val Slate50 = Color(0xFFF8FAFC)
 val Slate100 = Color(0xFFF1F5F9)
 val Slate200 = Color(0xFFE2E8F0)
@@ -19,40 +19,64 @@ val Slate800 = Color(0xFF1E293B)
 val Slate900 = Color(0xFF0F172A)
 val Slate950 = Color(0xFF020617)
 
-// Light Theme Colors (Slate-based)
-val md_theme_light_primary = AstroBlue
+// Light Theme Tokens (Google M3)
+val md_theme_light_primary = Color(0xFF0B57D0)
 val md_theme_light_onPrimary = Color(0xFFFFFFFF)
-val md_theme_light_primaryContainer = Color(0xFFD1E4FF)
-val md_theme_light_onPrimaryContainer = Color(0xFF001D36)
-val md_theme_light_secondary = Color(0xFF475569) // Slate 600
+val md_theme_light_primaryContainer = Color(0xFFD3E3FD)
+val md_theme_light_onPrimaryContainer = Color(0xFF041E49)
+val md_theme_light_secondary = Color(0xFF00639B)
 val md_theme_light_onSecondary = Color(0xFFFFFFFF)
-val md_theme_light_secondaryContainer = Slate100
-val md_theme_light_onSecondaryContainer = Slate900
+val md_theme_light_secondaryContainer = Color(0xFFC2E7FF)
+val md_theme_light_onSecondaryContainer = Color(0xFF001D35)
+val md_theme_light_tertiary = Color(0xFF006874)
+val md_theme_light_onTertiary = Color(0xFFFFFFFF)
+val md_theme_light_tertiaryContainer = Color(0xFF97F0FF)
+val md_theme_light_onTertiaryContainer = Color(0xFF001F24)
 val md_theme_light_error = Color(0xFFBA1A1A)
-val md_theme_light_background = Slate50
-val md_theme_light_onBackground = Slate900
-val md_theme_light_surface = Slate50
-val md_theme_light_onSurface = Slate900
-val md_theme_light_surfaceVariant = Slate100
-val md_theme_light_onSurfaceVariant = Slate600
-val md_theme_light_outline = Slate400
-val md_theme_light_outlineVariant = Slate200
+val md_theme_light_onError = Color(0xFFFFFFFF)
+val md_theme_light_errorContainer = Color(0xFFFFDAD6)
+val md_theme_light_onErrorContainer = Color(0xFF410002)
+val md_theme_light_background = Color(0xFFF8F9FA)
+val md_theme_light_onBackground = Color(0xFF1F1F1F)
+val md_theme_light_surface = Color(0xFFFFFFFF)
+val md_theme_light_onSurface = Color(0xFF1F1F1F)
+val md_theme_light_surfaceVariant = Color(0xFFE1E3E1)
+val md_theme_light_onSurfaceVariant = Color(0xFF444746)
+val md_theme_light_outline = Color(0xFF747775)
+val md_theme_light_outlineVariant = Color(0xFFC4C7C5)
+val md_theme_light_surfaceContainerLowest = Color(0xFFFFFFFF)
+val md_theme_light_surfaceContainerLow = Color(0xFFF3F4F6)
+val md_theme_light_surfaceContainer = Color(0xFFECEEF1)
+val md_theme_light_surfaceContainerHigh = Color(0xFFE6E8EB)
+val md_theme_light_surfaceContainerHighest = Color(0xFFDFE2E6)
 
-// Dark Theme Colors (Modern Slate)
-val md_theme_dark_primary = Color(0xFF9ECAFF)
-val md_theme_dark_onPrimary = Color(0xFF003258)
-val md_theme_dark_primaryContainer = AstroBlueDark
-val md_theme_dark_onPrimaryContainer = AstroBlueLight
-val md_theme_dark_secondary = Color(0xFF94A3B8) // Slate 400
-val md_theme_dark_onSecondary = Slate900
-val md_theme_dark_secondaryContainer = Slate800
-val md_theme_dark_onSecondaryContainer = Slate50
+// Dark Theme Tokens (Google M3 Dark Mode)
+val md_theme_dark_primary = Color(0xFFA8C7FA)
+val md_theme_dark_onPrimary = Color(0xFF062E6F)
+val md_theme_dark_primaryContainer = Color(0xFF0842A0)
+val md_theme_dark_onPrimaryContainer = Color(0xFFD3E3FD)
+val md_theme_dark_secondary = Color(0xFF7FCFFF)
+val md_theme_dark_onSecondary = Color(0xFF003355)
+val md_theme_dark_secondaryContainer = Color(0xFF004B77)
+val md_theme_dark_onSecondaryContainer = Color(0xFFC2E7FF)
+val md_theme_dark_tertiary = Color(0xFF4DD8EC)
+val md_theme_dark_onTertiary = Color(0xFF00363D)
+val md_theme_dark_tertiaryContainer = Color(0xFF004F58)
+val md_theme_dark_onTertiaryContainer = Color(0xFF97F0FF)
 val md_theme_dark_error = Color(0xFFFFB4AB)
-val md_theme_dark_background = Slate900
-val md_theme_dark_onBackground = Slate50
-val md_theme_dark_surface = Slate900
-val md_theme_dark_onSurface = Slate50
-val md_theme_dark_surfaceVariant = Slate800
-val md_theme_dark_onSurfaceVariant = Slate400
-val md_theme_dark_outline = Slate500
-val md_theme_dark_outlineVariant = Color(0xFF334155)
+val md_theme_dark_onError = Color(0xFF690005)
+val md_theme_dark_errorContainer = Color(0xFF93000A)
+val md_theme_dark_onErrorContainer = Color(0xFFFFDAD6)
+val md_theme_dark_background = Color(0xFF121316)
+val md_theme_dark_onBackground = Color(0xFFE3E2E6)
+val md_theme_dark_surface = Color(0xFF1E1F22)
+val md_theme_dark_onSurface = Color(0xFFE3E2E6)
+val md_theme_dark_surfaceVariant = Color(0xFF444746)
+val md_theme_dark_onSurfaceVariant = Color(0xFFC4C7C5)
+val md_theme_dark_outline = Color(0xFF8E918F)
+val md_theme_dark_outlineVariant = Color(0xFF444746)
+val md_theme_dark_surfaceContainerLowest = Color(0xFF0F1012)
+val md_theme_dark_surfaceContainerLow = Color(0xFF1A1B1E)
+val md_theme_dark_surfaceContainer = Color(0xFF202124)
+val md_theme_dark_surfaceContainerHigh = Color(0xFF2B2C30)
+val md_theme_dark_surfaceContainerHighest = Color(0xFF36373B)

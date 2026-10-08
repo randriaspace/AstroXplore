@@ -139,6 +139,12 @@ class ExploreViewModel @Inject constructor(
         _searchFilter.value = SearchFilter()
     }
 
+    fun retry() {
+        viewModelScope.launch {
+            performSearch(_searchQuery.value, _searchFilter.value)
+        }
+    }
+
     private suspend fun performSearch(query: String, filter: SearchFilter) {
         if (query.isBlank() && !filter.isActive()) {
             _uiState.value = ExploreUiState.Idle

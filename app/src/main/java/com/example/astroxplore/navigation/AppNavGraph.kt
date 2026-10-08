@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.Newspaper
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
@@ -268,7 +269,16 @@ fun RootNavHost(
                 }
 
                 composable<Screen.Library> {
-                    LibraryScreen(onPaperClick = { bibcode -> navController.navigate(Screen.PaperDetails(bibcode)) })
+                    LibraryScreen(
+                        onPaperClick = { bibcode -> navController.navigate(Screen.PaperDetails(bibcode)) },
+                        onExploreClick = {
+                            navController.navigate(Screen.Explore()) {
+                                popUpTo<Screen.MainGraph> { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    )
                 }
 
                 composable<Screen.Profile> {
@@ -334,69 +344,61 @@ fun BottomNavigationBar(
         else -> "feed"
     }
 
-    Surface(
+    NavigationBar(
         modifier = modifier,
-        color = MaterialTheme.colorScheme.background,
-        tonalElevation = 0.dp
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 3.dp,
+        windowInsets = WindowInsets.navigationBars
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
-                .height(64.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            items.forEach { item ->
-                val isSelected = currentTab == item.route
-                NavigationBarItem(
-                    modifier = Modifier.weight(1f),
-                    icon = {
-                        AnimatedContent(
-                            targetState = isSelected,
-                            transitionSpec = {
-                                (fadeIn(animationSpec = tween(220, delayMillis = 90)) +
-                                        scaleIn(initialScale = 0.92f, animationSpec = tween(220, delayMillis = 90)))
-                                    .togetherWith(fadeOut(animationSpec = tween(90)))
-                            },
-                            label = "icon_transition"
-                        ) { selected ->
-                            Icon(
-                                imageVector = if (selected) item.filledIcon else item.outlinedIcon,
-                                contentDescription = item.label
-                            )
-                        }
-                    },
-                    label = {
-                        Text(
-                            text = item.label,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium
+        items.forEach { item ->
+            val isSelected = currentTab == item.route
+            NavigationBarItem(
+                icon = {
+                    AnimatedContent(
+                        targetState = isSelected,
+                        transitionSpec = {
+                            (fadeIn(animationSpec = tween(220, delayMillis = 60)) +
+                                    scaleIn(initialScale = 0.9f, animationSpec = tween(220, delayMillis = 60)))
+                                .togetherWith(fadeOut(animationSpec = tween(80)))
+                        },
+                        label = "icon_transition"
+                    ) { selected ->
+                        Icon(
+                            imageVector = if (selected) item.filledIcon else item.outlinedIcon,
+                            contentDescription = item.label
                         )
-                    },
-                    selected = isSelected,
-                    onClick = {
-                        val tabOptions: NavOptionsBuilder.() -> Unit = {
-                            popUpTo<Screen.MainGraph> { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                        when (item.route) {
-                            "feed" -> navController.navigate(Screen.Feed, tabOptions)
-                            "groups" -> navController.navigate(Screen.Groups, tabOptions)
-                            "explore" -> navController.navigate(Screen.Explore(), tabOptions)
-                            "library" -> navController.navigate(Screen.Library, tabOptions)
-                            "profile" -> navController.navigate(Screen.Profile, tabOptions)
-                        }
-                    },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                    }
+                },
+                label = {
+                    Text(
+                        text = item.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                     )
+                },
+                selected = isSelected,
+                onClick = {
+                    val tabOptions: NavOptionsBuilder.() -> Unit = {
+                        popUpTo<Screen.MainGraph> { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                    when (item.route) {
+                        "feed" -> navController.navigate(Screen.Feed, tabOptions)
+                        "groups" -> navController.navigate(Screen.Groups, tabOptions)
+                        "explore" -> navController.navigate(Screen.Explore(), tabOptions)
+                        "library" -> navController.navigate(Screen.Library, tabOptions)
+                        "profile" -> navController.navigate(Screen.Profile, tabOptions)
+                    }
+                },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer
                 )
-            }
+            )
         }
     }
 }
