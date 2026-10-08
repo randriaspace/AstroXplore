@@ -21,6 +21,17 @@ object AstroTextParser {
         var text = input
             .replace(Regex("<\\s*(SUB|SUP|B|I|STRONG|EM)\\s*>", RegexOption.IGNORE_CASE)) { "<${it.groupValues[1].uppercase()}>" }
             .replace(Regex("<\\s*/\\s*(SUB|SUP|B|I|STRONG|EM)\\s*>", RegexOption.IGNORE_CASE)) { "</${it.groupValues[1].uppercase()}>" }
+            .replace("\\rm", "")
+            .replace("\\it", "")
+            .replace("\\,", " ")
+            .replace("\\;", " ")
+            .replace("\\!", "")
+            .replace("{-}", "-")
+            .replace("{+}", "+")
+            .replace("_{\\odot}", "☉")
+            .replace("^{\\odot}", "☉")
+            .replace("_{\\0}", "₀")
+            .replace("^{\\,}", "")
             .replace("\\odot", "☉")
             .replace("\\oplus", "⊕")
             .replace("\\aa", "Å")

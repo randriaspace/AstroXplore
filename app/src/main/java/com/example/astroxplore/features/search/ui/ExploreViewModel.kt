@@ -92,6 +92,14 @@ class ExploreViewModel @Inject constructor(
     private val _suggestedKeywords = MutableStateFlow<List<String>>(emptyList())
     val suggestedKeywords = _suggestedKeywords.asStateFlow()
 
+    private val _isLoadingMore = MutableStateFlow(false)
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+
+    private val _hasMoreResults = MutableStateFlow(true)
+    val hasMoreResults: StateFlow<Boolean> = _hasMoreResults.asStateFlow()
+
+    private var currentPage = 0
+
     init {
         loadSavedPapers()
         loadSuggestedKeywords()
@@ -145,23 +153,84 @@ class ExploreViewModel @Inject constructor(
         }
     }
 
+    fun loadNextPage() {
+        val currentQuery = searchQuery.value
+        val currentFilter = searchFilter.value
+        if ((currentQuery.isBlank() && !currentFilter.isActive()) || _isLoadingMore.value || !_hasMoreResults.value) {
+            return
+        }
+
+        val currentState = _uiState.value
+        if (currentState !is ExploreUiState.Success) return
+
+        viewModelScope.launch {
+            _isLoadingMore.value = true
+            try {
+                val nextPage = currentPage + 1
+                val solrQuery = NasaAdsQueryBuilder.buildAdvancedQuery(
+                    query = currentQuery,
+                    filter = currentFilter
+                )
+                val searchResult = paperRepository.getPapersByQueryWithTotal(
+                    query = solrQuery,
+                    sort = currentFilter.sortBy.solrValue,
+                    page = nextPage,
+                    pageSize = 10
+                )
+
+                if (searchResult.papers.isEmpty()) {
+                    _hasMoreResults.value = false
+                } else {
+                    currentPage = nextPage
+                    val existing = currentState.results
+                    val existingBibcodes = existing.map { it.bibcode }.toSet()
+                    val filteredNew = searchResult.papers.filterNot { existingBibcodes.contains(it.bibcode) }
+                    
+                    val combined = existing + filteredNew
+                    _uiState.value = ExploreUiState.Success(
+                        results = combined,
+                        totalFound = searchResult.totalFound
+                    )
+
+                    if (searchResult.papers.size < 10) {
+                        _hasMoreResults.value = false
+                    }
+                }
+            } catch (_: Exception) {
+            } finally {
+                _isLoadingMore.value = false
+            }
+        }
+    }
+
     private suspend fun performSearch(query: String, filter: SearchFilter) {
         if (query.isBlank() && !filter.isActive()) {
             _uiState.value = ExploreUiState.Idle
             return
         }
 
+        currentPage = 0
+        _hasMoreResults.value = true
         _uiState.value = ExploreUiState.Loading
+
         try {
             val solrQuery = NasaAdsQueryBuilder.buildAdvancedQuery(
                 query = query,
                 filter = filter
             )
-            val results = paperRepository.getPapersByQuery(
+            val searchResult = paperRepository.getPapersByQueryWithTotal(
                 query = solrQuery,
-                sort = filter.sortBy.solrValue
+                sort = filter.sortBy.solrValue,
+                page = 0,
+                pageSize = 20
             )
-            _uiState.value = ExploreUiState.Success(results)
+            _uiState.value = ExploreUiState.Success(
+                results = searchResult.papers,
+                totalFound = searchResult.totalFound
+            )
+            if (searchResult.papers.size < 20) {
+                _hasMoreResults.value = false
+            }
         } catch (e: Exception) {
             _uiState.value = ExploreUiState.Error(ErrorMapper.mapToMessage(e))
         }
@@ -171,6 +240,6 @@ class ExploreViewModel @Inject constructor(
 sealed interface ExploreUiState {
     data object Idle : ExploreUiState
     data object Loading : ExploreUiState
-    data class Success(val results: List<PaperModel>) : ExploreUiState
+    data class Success(val results: List<PaperModel>, val totalFound: Int = 0) : ExploreUiState
     data class Error(val messageResId: Int) : ExploreUiState
 }

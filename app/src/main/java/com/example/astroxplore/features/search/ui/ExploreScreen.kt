@@ -203,6 +203,28 @@ fun ExploreScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Sorting Chips: Recent & Cited
+                items(SortBy.entries.toList()) { sortBy ->
+                    val isSelected = filter.sortBy == sortBy
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { viewModel.setSortBy(sortBy) },
+                        label = { Text(sortBy.displayName) },
+                        leadingIcon = {
+                            val icon = if (sortBy == SortBy.DATE_DESC) Icons.Outlined.Schedule else Icons.Outlined.FormatQuote
+                            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
+                }
+
                 // Quick Toggle: Peer-Reviewed Only
                 item {
                     FilterChip(
@@ -322,7 +344,7 @@ fun ExploreScreen(
                                     )
                                 } else {
                                     Column(modifier = Modifier.fillMaxSize()) {
-                                        // Results Metric & Sorting Row
+                                        // Results Metric Row
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -338,46 +360,18 @@ fun ExploreScreen(
                                                     modifier = Modifier.size(16.dp)
                                                 )
                                                 Spacer(modifier = Modifier.width(6.dp))
+                                                val totalFormatted = java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(if (state.totalFound > 0) state.totalFound else state.results.size)
                                                 Text(
-                                                    text = "${state.results.size} Papers Found",
+                                                    text = "$totalFormatted Papers Found",
                                                     style = MaterialTheme.typography.labelLarge,
                                                     color = MaterialTheme.colorScheme.onSurface,
                                                     fontWeight = FontWeight.Bold
                                                 )
                                             }
-
-                                            // Sorting Chips (Recent vs Cited)
-                                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                SortBy.entries.forEach { sortBy ->
-                                                    val isSelected = filter.sortBy == sortBy
-                                                    FilterChip(
-                                                        selected = isSelected,
-                                                        onClick = { viewModel.setSortBy(sortBy) },
-                                                        label = {
-                                                            Text(
-                                                                text = sortBy.displayName,
-                                                                style = MaterialTheme.typography.labelSmall
-                                                            )
-                                                        },
-                                                        leadingIcon = {
-                                                            val icon = if (sortBy == SortBy.DATE_DESC)
-                                                                Icons.Outlined.Schedule
-                                                            else
-                                                                Icons.Outlined.FormatQuote
-                                                            Icon(icon, contentDescription = null, modifier = Modifier.size(14.dp))
-                                                        },
-                                                        shape = RoundedCornerShape(8.dp),
-                                                        colors = FilterChipDefaults.filterChipColors(
-                                                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                                                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                                        )
-                                                    )
-                                                }
-                                            }
                                         }
+
+                                        val isLoadingMore by viewModel.isLoadingMore.collectAsState()
+                                        val hasMoreResults by viewModel.hasMoreResults.collectAsState()
 
                                         LazyColumn(
                                             modifier = Modifier.fillMaxSize(),
@@ -393,6 +387,55 @@ fun ExploreScreen(
                                                         selectedPaperForDetails = paper
                                                     }
                                                 )
+                                            }
+
+                                            item {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(vertical = 16.dp, horizontal = 24.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    if (isLoadingMore) {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                        ) {
+                                                            CircularProgressIndicator(
+                                                                modifier = Modifier.size(20.dp),
+                                                                strokeWidth = 2.dp,
+                                                                color = MaterialTheme.colorScheme.primary
+                                                            )
+                                                            Text(
+                                                                text = "Loading more results...",
+                                                                style = MaterialTheme.typography.bodyMedium,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
+                                                    } else if (hasMoreResults) {
+                                                        OutlinedButton(
+                                                            onClick = { viewModel.loadNextPage() },
+                                                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                                                            shape = MaterialTheme.shapes.extraLarge,
+                                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                                                        ) {
+                                                            Icon(Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.size(20.dp))
+                                                            Spacer(modifier = Modifier.width(8.dp))
+                                                            Text(
+                                                                text = "Load More Results",
+                                                                style = MaterialTheme.typography.labelLarge,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = MaterialTheme.colorScheme.primary
+                                                            )
+                                                        }
+                                                    } else {
+                                                        Text(
+                                                            text = "All relevant papers loaded",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
                                     }

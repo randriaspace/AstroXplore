@@ -85,10 +85,7 @@ fun LoginScreen(
             )
 
             Spacer(modifier = Modifier.height(24.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SocialAuthPillButton(isGoogle = true, isSignUp = false, modifier = Modifier.weight(1f))
-                SocialAuthPillButton(isGoogle = false, isSignUp = false, modifier = Modifier.weight(1f))
-            }
+            SocialAuthRow()
 
             Spacer(modifier = Modifier.height(12.dp))
             AuthOrDivider()

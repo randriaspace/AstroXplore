@@ -1,18 +1,15 @@
 package com.example.astroxplore.features.auth.ui
 
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,9 +19,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.PhoneIphone
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -44,22 +38,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.disabled
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.astroxplore.R
+
+enum class SocialAuthProvider(val displayName: String, val iconRes: Int) {
+    GOOGLE("Google", R.drawable.ic_google_logo),
+    APPLE("Apple", R.drawable.ic_apple_logo),
+    ORCID("ORCID iD", R.drawable.ic_orcid_logo)
+}
 
 @Composable
 fun AuthHeader(
@@ -133,122 +125,102 @@ fun AstroAuthTextField(
 }
 
 @Composable
-fun SocialAuthPillButton(
-    isGoogle: Boolean,
-    isSignUp: Boolean,
+fun SocialAuthRow(
     modifier: Modifier = Modifier
 ) {
-    val action = when {
-        isGoogle && isSignUp -> "Sign up with Google"
-        isGoogle -> "Sign in with Google"
-        isSignUp -> "Continue with Apple"
-        else -> "Sign in with Apple"
-    }
-    val isDarkTheme = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    var selectedProviderForPopup by remember { mutableStateOf<SocialAuthProvider?>(null) }
 
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        if (isGoogle) {
-            BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .semantics(mergeDescendants = true) {
-                        contentDescription = "$action, coming soon"
-                        role = Role.Button
-                        disabled()
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                val artworkWidth = maxWidth
-                val artworkHeight = artworkWidth / 4.5f
-                val buttonLabelStart = artworkWidth * 0.2222f
-                val buttonLabelWidth = artworkWidth * 0.7778f
-                val radius = artworkHeight / 2
-
-                Box(
-                    modifier = Modifier
-                        .width(artworkWidth)
-                        .height(artworkHeight)
-                ) {
-                    Image(
-                        painter = painterResource(
-                            id = if (isDarkTheme) R.drawable.google_signin_dark else R.drawable.google_signin_light
-                        ),
-                        contentDescription = null,
-                        modifier = Modifier.matchParentSize()
-                    )
-
-                    if (isSignUp) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterStart)
-                                .offset(x = buttonLabelStart)
-                                .width(buttonLabelWidth)
-                                .fillMaxHeight()
-                                .background(
-                                    color = if (isDarkTheme) Color(0xFF131314) else Color.White,
-                                    shape = RoundedCornerShape(topEnd = radius, bottomEnd = radius)
-                                )
-                        )
-                    }
-
-                    if (isSignUp) {
-                        Text(
-                            text = action,
-                            color = if (isDarkTheme) Color(0xFFE3E3E3) else Color(0xFF1F1F1F),
-                            fontSize = (artworkHeight.value * 0.35f).sp,
-                            lineHeight = (artworkHeight.value * 0.5f).sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .width(buttonLabelWidth)
-                        )
-                        Box(
-                            modifier = Modifier
-                                .matchParentSize()
-                                .border(
-                                    width = 1.dp,
-                                    color = if (isDarkTheme) Color(0xFF8E918F) else Color(0xFF747775),
-                                    shape = RoundedCornerShape(radius)
-                                )
-                        )
-                    }
-                }
-            }
-        } else {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SocialAuthProvider.entries.forEach { provider ->
             Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .semantics(mergeDescendants = true) {
-                        contentDescription = "$action, coming soon"
-                        role = Role.Button
-                        disabled()
-                    },
+                onClick = { selectedProviderForPopup = provider },
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    Icon(Icons.Default.PhoneIphone, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(action, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                    Icon(
+                        painter = painterResource(id = provider.iconRes),
+                        contentDescription = "Sign in with ${provider.displayName}",
+                        tint = Color.Unspecified,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             }
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "Coming soon",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    if (selectedProviderForPopup != null) {
+        SocialAuthComingSoonDialog(
+            provider = selectedProviderForPopup!!,
+            onDismiss = { selectedProviderForPopup = null }
         )
     }
+}
+
+@Composable
+fun SocialAuthComingSoonDialog(
+    provider: SocialAuthProvider,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                modifier = Modifier.size(56.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        painter = painterResource(id = provider.iconRes),
+                        contentDescription = null,
+                        tint = Color.Unspecified,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+        },
+        title = {
+            Text(
+                text = "${provider.displayName} Sign-In",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center
+            )
+        },
+        text = {
+            Text(
+                text = "Single Sign-On with ${provider.displayName} is currently under final integration for our upcoming release.\n\nIn the meantime, feel free to sign in or register instantly using your email address!",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Text("Got it", fontWeight = FontWeight.Bold)
+            }
+        },
+        shape = MaterialTheme.shapes.extraLarge,
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }
 
 @Composable

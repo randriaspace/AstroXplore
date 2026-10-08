@@ -9,6 +9,11 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class SearchResultWithTotal(
+    val papers: List<PaperModel>,
+    val totalFound: Int
+)
+
 @Singleton
 class PaperRepository @Inject constructor(
     private val apiService: NasaAdsApiService,
@@ -23,9 +28,6 @@ class PaperRepository @Inject constructor(
         if (!append) {
             feedPaperDao.refreshFeed(newPapers.map { it.toFeedEntity() })
         } else {
-            // Room handles append if we use a specific strategy, but usually feed is refreshed.
-            // For infinite scroll, we might not want to persist all 1000 pages to local DB
-            // Let's keep local DB for the "Recent Top 20" and handle deep scroll in-memory/cache.
             feedPaperDao.insertPapers(newPapers.map { it.toFeedEntity() })
         }
     }
@@ -43,6 +45,24 @@ class PaperRepository @Inject constructor(
             start = page * pageSize
         )
         return response.response.docs
+    }
+
+    suspend fun getPapersByQueryWithTotal(
+        query: String,
+        sort: String = "date desc",
+        page: Int = 0,
+        pageSize: Int = 20
+    ): SearchResultWithTotal {
+        val response = apiService.executeQuery(
+            query = query,
+            sort = sort,
+            rows = pageSize,
+            start = page * pageSize
+        )
+        return SearchResultWithTotal(
+            papers = response.response.docs,
+            totalFound = response.response.numFound
+        )
     }
 
     // Mappers
