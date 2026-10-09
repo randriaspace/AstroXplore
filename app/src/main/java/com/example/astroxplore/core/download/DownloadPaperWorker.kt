@@ -51,12 +51,12 @@ class DownloadPaperWorker(
             val request = Request.Builder().url(pdfUrl).build()
             val response = okHttpClient.newCall(request).execute()
 
-            if (!response.isSuccessful || response.body == null) {
+            if (!response.isSuccessful) {
                 savedPaperDao.updateDownloadProgress(bibcode, DownloadState.FAILED, 0)
                 return Result.failure()
             }
 
-            val body = response.body!!
+            val body = response.body
             val contentLength = body.contentLength()
             val inputStream = body.byteStream()
             val outputStream = FileOutputStream(tempFile)

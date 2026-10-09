@@ -4,19 +4,23 @@ import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.Launch
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.outlined.Analytics
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.FormatQuote
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,15 +30,14 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import com.example.astroxplore.core.database.entity.DownloadState
-import com.example.astroxplore.core.ui.components.*
+import com.example.astroxplore.core.ui.components.AstroTabItem
+import com.example.astroxplore.core.ui.components.AstroTabRow
+import com.example.astroxplore.core.ui.components.LottieLoadingView
+import com.example.astroxplore.core.ui.components.PrimaryActionDock
 import com.example.astroxplore.features.feed.model.PaperModel
-import com.example.astroxplore.features.feed.ui.components.AstroAbstractView
-import com.example.astroxplore.features.feed.ui.components.AstroPaperTitleText
+import com.example.astroxplore.features.feed.ui.components.*
 import com.example.astroxplore.features.groups.ui.components.GroupPickerSheet
 import kotlinx.coroutines.launch
 import java.io.File
@@ -218,7 +221,7 @@ fun PaperDetailsScreen(
 }
 
 /**
- * Tabbed Paper Details reading container.
+ * Tabbed Paper Details reading container with smooth fluid tab transitions.
  */
 @Composable
 private fun PaperDetailsMainContent(
@@ -276,311 +279,4 @@ private fun PaperDetailsMainContent(
 
         Spacer(modifier = Modifier.height(24.dp))
     }
-}
-
-@Composable
-private fun HeroPublicationHeaderCard(paper: PaperModel) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("hero_publication_card"),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp)
-        ) {
-            // Header: Date & Category & arXiv Badge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Schedule,
-                        contentDescription = null,
-                        modifier = Modifier.size(15.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = paper.dateDisplay,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                if (!paper.arxivId.isNullOrBlank()) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = "arXiv:${paper.arxivId}",
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            if (paper.category.isNotBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = paper.category.uppercase(),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Title with LaTeX support
-            AstroPaperTitleText(
-                title = paper.title,
-                maxLines = Int.MAX_VALUE,
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    lineHeight = 28.sp
-                )
-            )
-
-            // Author collaboration list with monogram chips
-            if (paper.authors.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(12.dp))
-                AuthorChipsFlow(
-                    authors = paper.authors,
-                    initialVisibleCount = 3
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun OverviewTabContent(paper: PaperModel) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Quick Metrics Badges
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            MetadataMetricBadge(
-                label = "Citations",
-                value = "${paper.citationCount}",
-                icon = Icons.Outlined.FormatQuote
-            )
-            paper.arxivId?.let { arxiv ->
-                MetadataMetricBadge(
-                    label = "arXiv ID",
-                    value = arxiv,
-                    icon = Icons.Outlined.Tag
-                )
-            }
-            if (paper.bibcode.isNotBlank()) {
-                MetadataMetricBadge(
-                    label = "Bibcode",
-                    value = paper.bibcode.take(12),
-                    icon = Icons.Outlined.Bookmark
-                )
-            }
-        }
-
-        // Abstract Section
-        CollapsibleSection(
-            title = "Abstract",
-            icon = Icons.Outlined.MenuBook,
-            initiallyExpanded = true
-        ) {
-            AstroAbstractView(
-                rawAbstract = paper.abstractText,
-                isExpanded = true
-            )
-        }
-    }
-}
-
-@Composable
-private fun MetricsTabContent(
-    paper: PaperModel,
-    onOpenAds: () -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Impact Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-            ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-        ) {
-            Column(modifier = Modifier.padding(18.dp)) {
-                Text(
-                    text = "CITATION IMPACT",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = "${paper.citationCount}",
-                        style = MaterialTheme.typography.displaySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "tracked citations",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 6.dp)
-                    )
-                }
-            }
-        }
-
-        // Publication Metadata Section
-        CollapsibleSection(
-            title = "Publication Metadata",
-            icon = Icons.Outlined.Info,
-            initiallyExpanded = true
-        ) {
-            PublicationDetailRow(label = "Published Date", value = paper.dateDisplay)
-            PublicationDetailRow(label = "Bibcode", value = paper.bibcode)
-            paper.arxivId?.let { arxiv ->
-                PublicationDetailRow(label = "arXiv Identifier", value = arxiv)
-            }
-            if (paper.category.isNotBlank()) {
-                PublicationDetailRow(label = "Primary Category", value = paper.category)
-            }
-            paper.rawPubDate?.let { pubDate ->
-                PublicationDetailRow(label = "Raw Release Stamp", value = pubDate)
-            }
-        }
-
-        // External ADS Portal Link Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-            ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "NASA ADS Abstract Service",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "View peer reviews and citation tree on ADS",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                FilledTonalIconButton(onClick = onOpenAds) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.Launch,
-                        contentDescription = "Open NASA ADS"
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun BibTeXTabContent(
-    bibtex: String,
-    onCopyBibTeX: () -> Unit,
-    onShareBibTeX: () -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        BibTeXCodeBlock(
-            bibtexCode = bibtex,
-            onCopyClick = onCopyBibTeX,
-            onShareClick = onShareBibTeX
-        )
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-            )
-        ) {
-            Row(
-                modifier = Modifier.padding(14.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.FormatQuote,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-                Text(
-                    text = "Standard BibTeX record generated for use with Overleaf, LaTeX, Zotero, or Mendeley.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-private fun PaperModel.toBibTeX(): String = buildString {
-    append("@ARTICLE{").append(bibcode).append(",\n")
-    if (authors.isNotEmpty()) {
-        append("  author = {").append(authors.joinToString(" and ")).append("},\n")
-    }
-    append("  title = {").append(title).append("},\n")
-    rawPubDate?.take(4)?.toIntOrNull()?.let { year ->
-        append("  year = {").append(year).append("},\n")
-    }
-    append("  bibcode = {").append(bibcode).append("}\n}")
 }

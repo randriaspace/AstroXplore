@@ -492,6 +492,7 @@ fun LibraryScreen(
 /**
  * Message / Email style expanded list item with swipe-to-remove gesture
  */
+@Suppress("DEPRECATION")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpandedLibraryListItem(
