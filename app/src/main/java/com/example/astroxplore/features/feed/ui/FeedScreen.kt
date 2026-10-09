@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.astroxplore.R
 import com.example.astroxplore.features.feed.model.PaperModel
+import com.example.astroxplore.core.ui.components.AstroM3DockedLinearProgress
 import com.example.astroxplore.core.ui.components.OfflineFallbackState
 import com.example.astroxplore.features.feed.ui.components.PaperCard
 import com.example.astroxplore.features.feed.ui.components.PaperCardSkeleton
@@ -152,6 +153,8 @@ fun FeedScreen(
                             selectedTab = selectedCategory,
                             onTabSelected = { viewModel.selectCategory(it) }
                         )
+
+                        AstroM3DockedLinearProgress(visible = isRefreshing)
                     }
                 }
             }

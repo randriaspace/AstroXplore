@@ -1,11 +1,19 @@
 package com.example.astroxplore.core.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -87,15 +95,20 @@ fun Modifier.astroShimmer(
 }
 
 /**
- * Expressive Material 3 Circular Progress Indicator.
- * Includes smooth rotational physics, rounded stroke caps, and optional track glow & label.
+ * Official Material 3 Circular Progress Indicator.
+ * Supports both Determinate (known progress 0f..1f) and Indeterminate modes,
+ * featuring a contrasting continuous track, rounded stroke caps, and smooth animated transitions.
+ * Reference: https://m3.material.io/components/progress-indicators/guidelines
  */
 @Composable
-fun AstroM3LoadingIndicator(
+fun AstroM3CircularProgressIndicator(
+    progress: Float? = null,
     modifier: Modifier = Modifier,
     size: AstroLoadingSize = AstroLoadingSize.MEDIUM,
     color: Color = MaterialTheme.colorScheme.primary,
     trackColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    strokeWidth: Dp = size.strokeWidth,
+    showPercentage: Boolean = false,
     label: String? = null
 ) {
     Column(
@@ -115,17 +128,44 @@ fun AstroM3LoadingIndicator(
                     .background(color.copy(alpha = 0.08f))
             )
 
-            CircularProgressIndicator(
-                modifier = Modifier.size(size.dp),
-                color = color,
-                trackColor = trackColor,
-                strokeWidth = size.strokeWidth,
-                strokeCap = StrokeCap.Round
-            )
+            if (progress != null) {
+                val animatedProgress by animateFloatAsState(
+                    targetValue = progress.coerceIn(0f, 1f),
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessLow
+                    ),
+                    label = "astro_m3_circular_determinate"
+                )
+                CircularProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier.size(size.dp),
+                    color = color,
+                    trackColor = trackColor,
+                    strokeWidth = strokeWidth,
+                    strokeCap = StrokeCap.Round
+                )
+                if (showPercentage && size != AstroLoadingSize.SMALL) {
+                    Text(
+                        text = "${(animatedProgress * 100).toInt()}%",
+                        style = if (size == AstroLoadingSize.LARGE) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = color
+                    )
+                }
+            } else {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(size.dp),
+                    color = color,
+                    trackColor = trackColor,
+                    strokeWidth = strokeWidth,
+                    strokeCap = StrokeCap.Round
+                )
+            }
         }
 
         if (!label.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
@@ -137,22 +177,133 @@ fun AstroM3LoadingIndicator(
 }
 
 /**
+ * Backward-compatible wrapper forwarding to AstroM3CircularProgressIndicator.
+ */
+@Composable
+fun AstroM3LoadingIndicator(
+    modifier: Modifier = Modifier,
+    size: AstroLoadingSize = AstroLoadingSize.MEDIUM,
+    color: Color = MaterialTheme.colorScheme.primary,
+    trackColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    label: String? = null
+) {
+    AstroM3CircularProgressIndicator(
+        progress = null,
+        modifier = modifier,
+        size = size,
+        color = color,
+        trackColor = trackColor,
+        label = label
+    )
+}
+
+/**
  * Material 3 Linear Progress Indicator docked below top bars during background fetch/push tasks.
+ * Reference: https://m3.material.io/components/progress-indicators/guidelines
  */
 @Composable
 fun AstroLinearProgressBar(
     modifier: Modifier = Modifier,
+    progress: Float? = null,
     color: Color = MaterialTheme.colorScheme.primary,
-    trackColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+    trackColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    height: Dp = 4.dp
 ) {
-    LinearProgressIndicator(
+    if (progress != null) {
+        val animatedProgress by animateFloatAsState(
+            targetValue = progress.coerceIn(0f, 1f),
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessLow
+            ),
+            label = "astro_linear_determinate"
+        )
+        LinearProgressIndicator(
+            progress = { animatedProgress },
+            modifier = modifier
+                .fillMaxWidth()
+                .height(height)
+                .clip(RoundedCornerShape(height / 2)),
+            color = color,
+            trackColor = trackColor,
+            strokeCap = StrokeCap.Round
+        )
+    } else {
+        LinearProgressIndicator(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(height)
+                .clip(RoundedCornerShape(height / 2)),
+            color = color,
+            trackColor = trackColor,
+            strokeCap = StrokeCap.Round
+        )
+    }
+}
+
+/**
+ * Official Material 3 Docked Top App Bar Progress Indicator.
+ * Smoothly animates into view directly beneath the TopAppBar during sync, pull-to-refresh, or active queries.
+ */
+@Composable
+fun AstroM3DockedLinearProgress(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+    progress: Float? = null,
+    color: Color = MaterialTheme.colorScheme.primary,
+    trackColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    height: Dp = 4.dp
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = expandVertically() + fadeIn(),
+        exit = shrinkVertically() + fadeOut(),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        AstroLinearProgressBar(
+            progress = progress,
+            color = color,
+            trackColor = trackColor,
+            height = height
+        )
+    }
+}
+
+/**
+ * Compact inline progress badge for cards, action chips, and buttons.
+ */
+@Composable
+fun AstroCompactProgressBadge(
+    progress: Float? = null,
+    modifier: Modifier = Modifier,
+    statusText: String? = null,
+    indicatorColor: Color = MaterialTheme.colorScheme.primary,
+    trackColor: Color = MaterialTheme.colorScheme.surfaceVariant
+) {
+    Row(
         modifier = modifier
-            .fillMaxWidth()
-            .height(3.dp),
-        color = color,
-        trackColor = trackColor,
-        strokeCap = StrokeCap.Round
-    )
+            .clip(RoundedCornerShape(12.dp))
+            .background(trackColor.copy(alpha = 0.5f))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        AstroM3CircularProgressIndicator(
+            progress = progress,
+            size = AstroLoadingSize.SMALL,
+            color = indicatorColor,
+            trackColor = trackColor,
+            strokeWidth = 2.dp
+        )
+        if (!statusText.isNullOrBlank()) {
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
 }
 
 /**

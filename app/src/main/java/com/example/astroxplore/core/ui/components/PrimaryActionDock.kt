@@ -65,14 +65,17 @@ fun PrimaryActionDock(
                 ) {
                     when (downloadState) {
                         DownloadState.DOWNLOADING -> {
-                            CircularProgressIndicator(
-                                progress = { downloadProgress / 100f },
-                                modifier = Modifier.size(18.dp),
+                            val progressFloat = if (downloadProgress > 0) downloadProgress / 100f else null
+                            AstroM3CircularProgressIndicator(
+                                progress = progressFloat,
+                                size = AstroLoadingSize.SMALL,
                                 color = MaterialTheme.colorScheme.onPrimary,
-                                strokeWidth = 2.dp,
+                                trackColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f),
+                                strokeWidth = 2.5.dp
                             )
+                            val statusLabel = if (downloadProgress > 0) "Saving ($downloadProgress%)" else "Connecting..."
                             Text(
-                                text = "Saving ($downloadProgress%)",
+                                text = statusLabel,
                                 fontWeight = FontWeight.SemiBold,
                                 style = MaterialTheme.typography.labelLarge
                             )

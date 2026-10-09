@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.example.astroxplore.core.ui.components.AstroLoadingSize
-import com.example.astroxplore.core.ui.components.AstroM3LoadingIndicator
+import com.example.astroxplore.core.ui.components.AstroM3CircularProgressIndicator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -188,9 +188,10 @@ fun PdfViewerScreen(
         ) {
             when {
                 isLoading -> {
-                    AstroM3LoadingIndicator(
+                    AstroM3CircularProgressIndicator(
                         size = AstroLoadingSize.LARGE,
-                        label = "Rendering PDF pages..."
+                        label = "Rendering PDF pages...",
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                     )
                 }
                 renderError != null -> {

@@ -38,6 +38,7 @@ import com.example.astroxplore.features.feed.model.PaperModel
 import com.example.astroxplore.features.feed.ui.components.PaperCard
 import com.example.astroxplore.features.feed.ui.components.PaperDetailsBottomSheet
 import com.example.astroxplore.features.feed.ui.components.PaperCardSkeleton
+import com.example.astroxplore.core.ui.components.AstroM3DockedLinearProgress
 import com.example.astroxplore.core.ui.components.OfflineFallbackState
 
 private val QUICK_DISCOVERY_TOPICS = listOf(
@@ -297,6 +298,8 @@ fun ExploreScreen(
                     )
                 }
             }
+
+            AstroM3DockedLinearProgress(visible = uiState is ExploreUiState.Loading)
 
             // Results Content with Animated State Transitions
             Box(modifier = Modifier.fillMaxSize()) {

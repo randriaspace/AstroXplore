@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.astroxplore.core.ui.components.AstroLinearProgressBar
+import com.example.astroxplore.core.ui.components.AstroM3DockedLinearProgress
 import com.example.astroxplore.core.ui.components.AstroPaperCardSkeleton
 import com.example.astroxplore.features.feed.model.PaperModel
 import kotlinx.coroutines.launch
@@ -262,6 +263,7 @@ fun LibraryScreen(
                             )
                         }
                     }
+                    AstroM3DockedLinearProgress(visible = isRefreshing)
                 }
             }
         }

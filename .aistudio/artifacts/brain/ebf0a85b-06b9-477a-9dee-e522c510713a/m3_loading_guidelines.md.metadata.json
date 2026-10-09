@@ -1,5 +1,5 @@
 {
-  "summary":  "Material Design 3 Loading Indicator guidelines and architectural specifications for AstroXplore, covering circular, linear, skeleton shimmer, and startup transition patterns.",
-  "updatedAt":  "2026-10-09T10:36:16.652573900Z",
+  "summary":  "Updated Material Design 3 guidelines artifact with official progress indicator specifications, detailing determinate vs. indeterminate behavior, track contrast, rounded stroke ends, and top app bar docking.",
+  "updatedAt":  "2026-10-09T12:23:56.111331944Z",
   "userFacing":  true
 }

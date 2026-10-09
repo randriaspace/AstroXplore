@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan to modernize all loading screens and progress animations across AstroXplore to Material 3 standards, eliminate Lottie dependencies, introduce expressive skeleton shimmer loaders, and fix the startup onboarding flash.",
-  "updatedAt":  "2026-10-09T10:32:35.095910769Z",
+  "summary":  "Implementation plan to adopt official Material 3 Progress Indicators (m3.material.io/components/progress-indicators/guidelines) across AstroXplore, featuring top app bar docked linear indicators, circular card indicators with contrasting tracks, and dynamic transitions from indeterminate to determinate progress during downloads and syncs.",
+  "updatedAt":  "2026-10-09T12:18:58.761382075Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

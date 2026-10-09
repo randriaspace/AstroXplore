@@ -1,26 +1,27 @@
-# Modern Material 3 Loading System & Seamless Startup Plan
+# Material 3 Progress Indicators Implementation Plan
 
-Modernize all loading states, progress indicators, and transitions across AstroXplore to adhere to official Material Design 3 guidelines (m3.material.io/components/loading-indicator), replace legacy Lottie dependencies with native Compose M3 animations, implement expressive skeleton shimmer placeholders, and eliminate the startup onboarding flash.
+Adopt the official [Material Design 3 Progress Indicators Guidelines](https://m3.material.io/components/progress-indicators/guidelines) across AstroXplore, delivering high-precision linear and circular progress indicators featuring continuous visible tracks, rounded stroke caps, and seamless transitions from indeterminate connection phases to determinate percentage tracking.
+
+---
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following architectural decisions were confirmed based on your requirements:
-> - **Loading Indicator Aesthetic**: Expressive M3 circular and linear indicators paired with layout-matching skeleton shimmer placeholders for content screens.
-> - **Zero-Flash Startup Engine**: Splash screen is held securely until both authentication status and onboarding persistence fully resolve before mounting the navigation host.
-> - **Background Operation Feedback**: Top app bar indeterminate linear progress indicators with subtle snackbars for syncing, pulling, and pushing data.
-> - **Lottie Phase-Out**: Complete removal of Lottie loading assets in favor of pure, lightweight, theme-aware Jetpack Compose M3 animations.
+> Based on your selected preferences and the Material 3 guidelines:
+> - **Indicator Placement**: Docked linear progress bars directly under Top App Bars across Feed, Library, and Explore, paired with circular indicators on cards and download actions.
+> - **Indeterminate-to-Determinate Dynamic Transition**: Indicators start in indeterminate motion while negotiating network streams, then smoothly transition into determinate percentage progress as bytes download.
+> - **Track Geometry & Styling**: Distinct, contrasting background track (`surfaceVariant`) with rounded stroke ends (`StrokeCap.Round`) and M3 standard easing transitions.
 
 ---
 
 ## 1. Overview & Core Concept
 
-- **What It Does**: Replaces heavy third-party Lottie animations across AstroXplore with official Material 3 progress indicators and native Compose shimmer skeletons. Stabilizes the app startup lifecycle so authenticated users immediately enter the main feed without intermediate onboarding flickers.
-- **Target Audience / Persona**: Astrophysicists, researchers, and students who require fast, fluid, distraction-free navigation when browsing publications, exploring topics, and syncing offline papers.
+- **What It Does**: Implements official Material 3 Progress Indicators in Jetpack Compose, replacing basic spinners with track-anchored indicators. Provides instant visual feedback on progress state (connecting vs. active downloading) across paper fetching, offline PDF caching, and journal club syncing.
+- **Target Audience / Persona**: Researchers downloading high-density astrophysics preprints and syncing collections, who need clear visual confirmation of download speed and remaining wait times.
 - **Key Value**: 
-  - Zero UI flicker on app cold start.
-  - Consistent Google-grade Material 3 motion language and tactile progress feedback.
-  - Faster render times and lower memory footprint by removing Lottie JSON decoders.
+  - Immediate feedback with visible track rings that demonstrate total capacity.
+  - Zero jarring jumps between connecting and downloading states.
+  - Consistent adherence to the Material Design 3 Progress Indicator guidelines.
 
 ---
 
@@ -28,38 +29,43 @@ Modernize all loading states, progress indicators, and transitions across AstroX
 
 ### Key User Flows
 
-1. **Cold Start & Session Settling**:
-   - The user opens the app.
-   - A branded Material 3 splash screen displays the AstroXplore identity with an elegant, modern M3 indicator.
-   - Only when **both** session authentication (`SessionStatus`) and DataStore onboarding status (`isOnboarded`) are verified does the splash gracefully cross-fade into the target screen (`Feed` for onboarded users, `Onboarding` for new users, or `Auth` for unauthenticated sessions).
-   - No flicker or intermediate navigation state is ever rendered.
+1. **Top App Bar Docked Linear Progress**:
+   - In `LibraryScreen`, `FeedScreen`, and `ExploreScreen`, when a refresh or sync is triggered, a sleek 4dp rounded linear progress bar appears flush against the bottom of the TopAppBar.
+   - The bar has a continuous track in `surfaceVariant` with a `primary` indicator flowing along it with rounded caps.
+   - It animates out cleanly with a fade transition when the operation completes.
 
-2. **Content Feed & Paper Details Loading**:
-   - When fetching recent arXiv papers or loading paper details, the screen displays a subtle **M3 Skeleton Shimmer Placeholder** matching the exact geometry of paper cards (header pill, LaTeX title bar, metadata badges, summary lines).
-   - Once data arrives, content fades in smoothly with a standard M3 easing curve (250ms).
+2. **Paper Download & PDF Viewer Progress**:
+   - In `PaperDetailsScreen` and `PdfViewerScreen`:
+     - **Phase 1 (Connecting)**: While establishing the OkHttp connection or querying arXiv, the circular indicator moves along a fixed visible track in indeterminate mode.
+     - **Phase 2 (Streaming)**: As `DownloadPaperWorker` streams bytes, the indicator smoothly switches to determinate mode, filling the circular track from 0% to 100% with animated progress and percentage typography.
+     - **Phase 3 (Completion)**: Replaces with a checkmark badge and ready status.
 
-3. **Background Sync & Pull-to-Refresh Feedback**:
-   - When pulling to refresh or downloading PDF archives in the background, a discrete indeterminate **M3 LinearProgressIndicator** animates along the top app bar without obscuring content.
-   - Non-intrusive M3 snackbars communicate sync completion or offline status.
+3. **Card-Level Circular Indicators**:
+   - In list items (`ExpandedLibraryListItem`, `PaperCard`), download status pills display a 20dp compact circular progress indicator with track background and rounded caps.
 
-### Visual Identity & Theme
-- **Color Palette**: Standard AstroXplore M3 semantic tokens (`MaterialTheme.colorScheme.primary`, `surfaceVariant`, `outlineVariant`).
-- **Shimmer Gradients**: Dynamic brush sweeping from `surfaceVariant.copy(alpha = 0.4f)` to `surfaceVariant.copy(alpha = 0.9f)` using infinite transition easing.
-- **Elevation & Radius**: M3 rounded corners (`ShapeDefaults.Medium` and `Large`) across all skeleton elements.
+### Visual Tokens & Specs
+- **Indicator Color**: `MaterialTheme.colorScheme.primary`
+- **Track Color**: `MaterialTheme.colorScheme.surfaceVariant` (contrasting, clearly visible)
+- **Stroke Cap**: `StrokeCap.Round`
+- **Linear Bar Height**: 4dp with 2dp corner rounding
+- **Circular Sizes**: 
+  - Compact / Card: 20dp (stroke 2.5dp)
+  - Medium / Action Dock: 36dp (stroke 3.5dp)
+  - Large / Reader: 56dp (stroke 4.5dp)
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-- **Decision 1: Native Compose M3 Indicators vs. Lottie Animations**
-  - *Chosen Approach*: Replace all Lottie loaders (`LottieLoadingView`) with custom, reusable M3 components (`AstroM3LoadingIndicator`, `AstroLinearProgressBar`, and `AstroShimmerCard`).
-  - *Why*: Eliminates APK bloat, removes frame drops caused by JSON parsing on lower-end devices, adapts automatically to dynamic M3 color schemes and Dark Mode, and aligns with Google Material 3 guidelines.
-  - *Alternatives Considered*: Updating Lottie files with modern vectors (rejected due to persistent dependencies and lack of native Compose M3 theme reactivity).
+- **Decision 1: Unified Dual-Mode Indicator (`AstroM3ProgressIndicator`)**
+  - *Chosen Approach*: Build a unified component supporting both `progress = null` (indeterminate) and `progress = Float` (determinate) with animated cross-fades between the two states.
+  - *Why*: Eliminates code duplication and allows screens to seamlessly switch states without recreating or recomposing layout nodes.
+  - *Alternatives Considered*: Separate disconnected components for determinate and indeterminate (rejected because state transitions would flicker).
 
-- **Decision 2: Splash Gate Navigation Synchronization**
-  - *Chosen Approach*: In `MainActivity.kt`, gate `RootNavHost` instantiation and splash overlay dismissal on a strict boolean condition: `sessionStatus !is SessionStatus.Initializing && (sessionStatus is SessionStatus.NotAuthenticated || isOnboarded != null)`. Keep the splash screen opaque until the start destination is statically immutable.
-  - *Why*: Prevents `NavHost` from temporarily defaulting to `Screen.OnboardingGraph` for 100–300ms while DataStore reads `isOnboarded` asynchronously.
-  - *Alternatives Considered*: Redirecting from inside `OnboardingScreen` (rejected as it causes the exact flash the user reported).
+- **Decision 2: Top App Bar Linear Docking Pattern**
+  - *Chosen Approach*: Dock `AstroM3DockedLinearProgress` directly beneath `TopAppBar` within `Scaffold` top bar slots.
+  - *Why*: Perfectly matches the M3 guidelines showcased in your screenshot (`Episodes` top app bar reference) without shifting content or obscuring lists.
+  - *Alternatives Considered*: Floating progress banner or bottom bar progress (rejected in favor of the official M3 TopAppBar docking standard).
 
 ---
 
@@ -67,48 +73,33 @@ Modernize all loading states, progress indicators, and transitions across AstroX
 
 ```
 ┌────────────────────────────────────────────────────────┐
-│                      Cold Start                        │
+│                   AstroXplore Top Bar                  │
 └──────────────────────────┬─────────────────────────────┘
                            │
              ┌─────────────▼─────────────┐
-             │ Session & Onboarding Gate │
-             │  (Holds M3 Splash State)  │
+             │ AstroM3DockedLinearProgress│
+             │   (Rounded Caps & Track)  │
              └─────────────┬─────────────┘
-                           │ Authenticated & Ready
-            ┌──────────────┴──────────────┐
-            ▼                             ▼
- ┌──────────────────────┐      ┌──────────────────────┐
- │  First-Time Visitor  │      │  Returning Scientist │
- │ (Screen.Onboarding)  │      │   (Screen.MainGraph) │
- └──────────────────────┘      └──────────┬───────────┘
-                                          │
-                  ┌───────────────────────┴───────────────────────┐
-                  ▼                                               ▼
-       ┌──────────────────────┐                       ┌──────────────────────┐
-       │   Screen Loading     │                       │ Background Sync/Push │
-       │  (Skeleton Shimmer & │                       │  (Top LinearProgress │
-       │  M3 Circular State)  │                       │    Indicator & Bar)  │
-       └──────────────────────┘                       └──────────────────────┘
+                           │
+             ┌─────────────┴─────────────┐
+             │   Indeterminate / Wait    │
+             │ (Connecting to arXiv API) │
+             └─────────────┬─────────────┘
+                           │ Stream begins (contentLength known)
+             ┌─────────────▼─────────────┐
+             │    Determinate Progress   │
+             │   (Smooth animated 0-100%)│
+             └───────────────────────────┘
 ```
 
-### Component Structure & Modular Plan
-
-1. **`core/ui/components/AstroLoadingIndicators.kt`** (New Unified File):
-   - `AstroM3LoadingIndicator`: Expressive Material 3 circular progress indicator with primary/secondary track styling, configurable sizes (`Small`, `Medium`, `Large`), and optional status label.
-   - `AstroLinearProgressBar`: Clean indeterminate linear progress indicator placed directly beneath app top bars during network queries.
-   - `AstroShimmerEffect`: Reusable `Modifier.astroShimmer()` using `rememberInfiniteTransition` to render smooth sweeps on card placeholders.
-   - `AstroPaperCardSkeleton`: Structural skeleton mockup mirroring `ExpandedLibraryListItem` and `PaperCard`.
-   - `AstroDetailsSkeleton`: Structural skeleton for paper metadata and abstract.
-
-2. **`MainActivity.kt`**:
-   - Refactor splash overlay and start destination gating logic to guarantee zero-flash transitions.
-   - Replace the Lottie book loader on the splash screen with a sleek, branded AstroXplore M3 loader.
-
-3. **Screen Modernization Across All Features**:
-   - `PaperDetailsScreen.kt`: Switch from `LottieLoadingView` to `AstroDetailsSkeleton`.
-   - `LibraryScreen.kt`: Switch from `LottieLoadingView` to `AstroPaperCardSkeleton` list and top linear sync progress.
-   - `ExploreScreen.kt`: Switch from `LottieLoadingView` to skeleton list.
-   - `GroupsScreen.kt` & `GroupDetailsScreen.kt`: Switch from `LottieLoadingView` to M3 indicators.
-   - `PdfViewerScreen.kt`: Switch to M3 determinate/indeterminate circular progress indicator with download percentage.
-   - `InterestsScreen.kt` & `EditProfileScreen.kt`: Switch to M3 loading indicators.
-   - Deprecate/clean up `LottieLoadingView.kt` and remove obsolete raw Lottie resources.
+### Planned File Edits
+1. **`core/ui/components/AstroLoadingIndicators.kt`**:
+   - Add `AstroM3CircularProgressIndicator`: Dual-mode (determinate & indeterminate) with contrasting track and rounded ends.
+   - Add `AstroM3DockedLinearProgress`: Top app bar docked linear indicator with track and animated progress.
+   - Add `AstroCompactProgressBadge`: Inline card-level progress indicator.
+2. **`features/feed/ui/PaperDetailsScreen.kt` & `PrimaryActionDock.kt`**:
+   - Wire the dual-mode progress indicator to the PDF download state (transitioning from indeterminate connecting to determinate percentage).
+3. **`features/library/ui/LibraryScreen.kt`**:
+   - Dock `AstroM3DockedLinearProgress` below the library top app bar during sync operations.
+4. **`features/library/ui/PdfViewerScreen.kt`**:
+   - Integrate the determinate circular progress indicator showing numeric percentage during file retrieval.
