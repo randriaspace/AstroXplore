@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.astroxplore.core.database.entity.DownloadState
 import com.example.astroxplore.core.ui.animation.expressiveBounce
@@ -81,9 +82,11 @@ fun PrimaryActionDock(
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
-                            text = "Open Publisher Link",
+                            text = "Open Link",
                             fontWeight = FontWeight.SemiBold,
-                            style = MaterialTheme.typography.labelLarge
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     } else {
                         when (downloadState) {
@@ -100,7 +103,9 @@ fun PrimaryActionDock(
                                 Text(
                                     text = statusLabel,
                                     fontWeight = FontWeight.SemiBold,
-                                    style = MaterialTheme.typography.labelLarge
+                                    style = MaterialTheme.typography.labelLarge,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                             DownloadState.DOWNLOADED -> {
@@ -112,7 +117,9 @@ fun PrimaryActionDock(
                                 Text(
                                     text = "Read Offline",
                                     fontWeight = FontWeight.SemiBold,
-                                    style = MaterialTheme.typography.labelLarge
+                                    style = MaterialTheme.typography.labelLarge,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                             else -> {
@@ -124,7 +131,9 @@ fun PrimaryActionDock(
                                 Text(
                                     text = "Read PDF",
                                     fontWeight = FontWeight.SemiBold,
-                                    style = MaterialTheme.typography.labelLarge
+                                    style = MaterialTheme.typography.labelLarge,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -158,7 +167,8 @@ fun PrimaryActionDock(
                         fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

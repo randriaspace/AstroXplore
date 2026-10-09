@@ -487,16 +487,41 @@ fun EmptyClubsState(
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(24.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onExploreClick) {
-                Icon(Icons.Default.Explore, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Browse Public Clubs")
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedButton(
+                onClick = onExploreClick,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(46.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(Icons.Default.Explore, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Explore",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
-            Button(onClick = onCreateClick) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Start a Club")
+            Button(
+                onClick = onCreateClick,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(46.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "New Club",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
