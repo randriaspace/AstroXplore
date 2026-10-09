@@ -71,6 +71,7 @@ import com.example.astroxplore.features.feed.ui.PaperDetailsScreen
 import com.example.astroxplore.features.groups.ui.GroupDetailsScreen
 import com.example.astroxplore.features.groups.ui.GroupsScreen
 import com.example.astroxplore.features.library.ui.LibraryScreen
+import com.example.astroxplore.features.library.ui.PdfViewerScreen
 import com.example.astroxplore.features.onboarding.ui.OnboardingScreen
 import com.example.astroxplore.features.profile.ui.EditProfileScreen
 import com.example.astroxplore.features.profile.ui.InterestsScreen
@@ -348,6 +349,18 @@ fun RootNavHost(
                     val details = backStackEntry.toRoute<Screen.PaperDetails>()
                     PaperDetailsScreen(
                         bibcode = details.bibcode,
+                        onNavigateBack = { navController.popBackStack() },
+                        onReadPdfClick = { bibcode, filePath, title ->
+                            navController.navigate(Screen.PdfViewer(bibcode, filePath, title))
+                        }
+                    )
+                }
+
+                composable<Screen.PdfViewer> { backStackEntry ->
+                    val args = backStackEntry.toRoute<Screen.PdfViewer>()
+                    PdfViewerScreen(
+                        paperTitle = args.paperTitle,
+                        pdfFilePath = args.pdfFilePath,
                         onNavigateBack = { navController.popBackStack() }
                     )
                 }

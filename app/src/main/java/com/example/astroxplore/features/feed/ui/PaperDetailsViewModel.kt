@@ -1,5 +1,6 @@
 package com.example.astroxplore.features.feed.ui
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.astroxplore.features.feed.data.PaperRepository
@@ -10,6 +11,7 @@ import com.example.astroxplore.features.library.data.LibraryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
@@ -70,6 +72,16 @@ class PaperDetailsViewModel @Inject constructor(
         viewModelScope.launch {
             libraryRepository.toggleSave(paper)
         }
+    }
+
+    fun downloadAndOpenPdf(
+        context: Context,
+        paper: PaperModel,
+        onOpenPdf: (bibcode: String, pdfFilePath: String, paperTitle: String) -> Unit
+    ) {
+        libraryRepository.downloadPaperPdf(context, paper)
+        val expectedFile = File(context.filesDir, "pdfs/${paper.bibcode}.pdf")
+        onOpenPdf(paper.bibcode, expectedFile.absolutePath, paper.title)
     }
 
     fun addPaperToGroup(groupId: String, bibcode: String) {

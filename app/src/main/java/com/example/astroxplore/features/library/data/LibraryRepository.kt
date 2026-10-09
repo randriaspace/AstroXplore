@@ -1,9 +1,11 @@
 package com.example.astroxplore.features.library.data
 
+import android.content.Context
 import com.example.astroxplore.core.database.dao.PendingPaperDeletionDao
 import com.example.astroxplore.core.database.dao.SavedPaperDao
 import com.example.astroxplore.core.database.entity.PendingPaperDeletionEntity
 import com.example.astroxplore.core.database.entity.SavedPaperEntity
+import com.example.astroxplore.core.download.DownloadPaperWorker
 import com.example.astroxplore.core.network.NetworkConnectivityObserver
 import com.example.astroxplore.features.feed.model.PaperModel
 import com.example.astroxplore.features.library.model.SavedPaperModel
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -49,6 +52,8 @@ class LibraryRepository @Inject constructor(
 
     fun isPaperSaved(bibcode: String): Flow<Boolean> = savedPaperDao.isPaperSaved(bibcode)
 
+    suspend fun getPaperEntity(bibcode: String): SavedPaperEntity? = savedPaperDao.getPaperByBibcode(bibcode)
+
     suspend fun toggleSave(paper: PaperModel) = withContext(Dispatchers.IO) {
         val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return@withContext
         val isCurrentlySaved = savedPaperDao.isPaperSaved(paper.bibcode).first()
@@ -60,34 +65,65 @@ class LibraryRepository @Inject constructor(
         }
     }
 
-    private suspend fun savePaper(userId: String, paper: PaperModel) {
-        // Clear any pending deletion for this paper
-        pendingPaperDeletionDao.removePendingDeletion(paper.bibcode)
+    fun downloadPaperPdf(context: Context, paper: PaperModel) {
+        val pdfUrl = paper.pdfUrl ?: return
+        
+        repositoryScope.launch {
+            val userId = supabaseClient.auth.currentUserOrNull()?.id ?: "local_user"
+            savePaper(userId, paper)
 
-        // Save locally first
+            val workData = androidx.work.workDataOf(
+                DownloadPaperWorker.KEY_BIBCODE to paper.bibcode,
+                DownloadPaperWorker.KEY_PDF_URL to pdfUrl
+            )
+
+            val request = androidx.work.OneTimeWorkRequestBuilder<DownloadPaperWorker>()
+                .setInputData(workData)
+                .setConstraints(
+                    androidx.work.Constraints.Builder()
+                        .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+                        .build()
+                )
+                .build()
+
+            androidx.work.WorkManager.getInstance(context)
+                .enqueueUniqueWork(
+                    "download_pdf_${paper.bibcode}",
+                    androidx.work.ExistingWorkPolicy.REPLACE,
+                    request
+                )
+        }
+    }
+
+    suspend fun getLocalPdfCacheSizeBytes(context: Context): Long = withContext(Dispatchers.IO) {
+        val pdfsDir = File(context.filesDir, "pdfs")
+        if (!pdfsDir.exists()) return@withContext 0L
+        pdfsDir.listFiles()?.sumOf { it.length() } ?: 0L
+    }
+
+    suspend fun clearLocalPdfCache(context: Context) = withContext(Dispatchers.IO) {
+        val pdfsDir = File(context.filesDir, "pdfs")
+        if (pdfsDir.exists()) {
+            pdfsDir.listFiles()?.forEach { it.delete() }
+        }
+        savedPaperDao.clearAllLocalPdfs()
+    }
+
+    private suspend fun savePaper(userId: String, paper: PaperModel) {
         savedPaperDao.savePaper(paper.toEntity(isSynced = false))
         
-        // Save to Supabase
         try {
-            val model = paper.toSupabaseModel(userId)
-            supabaseClient.postgrest["saved_papers"].insert(model)
+            supabaseClient.postgrest["saved_papers"].insert(paper.toSupabaseModel(userId))
             savedPaperDao.savePaper(paper.toEntity(isSynced = true))
         } catch (e: Exception) {
-            e.printStackTrace() // Log for debugging
-            // Remains unsynced locally, will sync when reconnected
+            e.printStackTrace()
         }
     }
 
     private suspend fun unsavePaper(userId: String, bibcode: String) {
-        // Remove locally immediately
         savedPaperDao.deletePaper(bibcode)
-        
-        // Record pending deletion in case device is offline
-        pendingPaperDeletionDao.insertPendingDeletion(
-            PendingPaperDeletionEntity(bibcode = bibcode, userId = userId)
-        )
+        pendingPaperDeletionDao.insertPendingDeletion(PendingPaperDeletionEntity(bibcode, userId))
 
-        // Remove from Supabase
         try {
             supabaseClient.postgrest["saved_papers"].delete {
                 filter {
@@ -98,14 +134,14 @@ class LibraryRepository @Inject constructor(
             pendingPaperDeletionDao.removePendingDeletion(bibcode)
         } catch (e: Exception) {
             e.printStackTrace()
-            // Remains in pendingPaperDeletionDao until reconnected
         }
     }
 
     suspend fun syncLibrary() = withContext(Dispatchers.IO) {
         val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return@withContext
+
         try {
-            // 1. Process pending remote deletions
+            // 1. Process pending deletions
             val pendingDeletions = pendingPaperDeletionDao.getPendingDeletions(userId)
             pendingDeletions.forEach { pending ->
                 try {
@@ -121,20 +157,18 @@ class LibraryRepository @Inject constructor(
                 }
             }
 
-            // 2. Sync local unsynced to remote
-            val unsynced = savedPaperDao.getUnsyncedPapers()
-            unsynced.forEach { paper ->
+            // 2. Process unsynced additions
+            val unsyncedLocal = savedPaperDao.getUnsyncedPapers()
+            unsyncedLocal.forEach { local ->
                 try {
-                    val model = paper.toSupabaseModel(userId)
-                    supabaseClient.postgrest["saved_papers"].insert(model)
-                    savedPaperDao.savePaper(paper.copy(isSynced = true))
+                    supabaseClient.postgrest["saved_papers"].insert(local.toSupabaseModel(userId))
+                    savedPaperDao.savePaper(local.copy(isSynced = true))
                 } catch (e: Exception) {
                     e.printStackTrace()
-                    // Fail silently, retry next sync
                 }
             }
 
-            // 3. Fetch remote papers
+            // 3. Fetch remote saved papers
             val remotePapers = supabaseClient.postgrest["saved_papers"]
                 .select(columns = Columns.ALL) {
                     filter {
@@ -142,11 +176,8 @@ class LibraryRepository @Inject constructor(
                     }
                 }
                 .decodeList<SavedPaperModel>()
-            
-            // Filter out any papers still pending deletion
-            val remainingPendingDeletions = pendingPaperDeletionDao.getPendingDeletions(userId)
-                .map { it.bibcode }
-                .toSet()
+
+            val remainingPendingDeletions = pendingPaperDeletionDao.getPendingDeletions(userId).map { it.bibcode }.toSet()
 
             // 4. Sync remote to local
             remotePapers.forEach { remote ->
@@ -189,7 +220,8 @@ class LibraryRepository @Inject constructor(
         category = category,
         dateDisplay = dateDisplay,
         citationCount = citationCount,
-        isSynced = isSynced
+        isSynced = isSynced,
+        pdfUrl = pdfUrl
     )
 
     private fun SavedPaperModel.toEntity(isSynced: Boolean = true) = SavedPaperEntity(

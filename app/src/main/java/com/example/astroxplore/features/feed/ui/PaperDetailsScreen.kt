@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.FormatQuote
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Schedule
@@ -48,6 +49,7 @@ import kotlinx.coroutines.launch
 fun PaperDetailsScreen(
     bibcode: String,
     onNavigateBack: () -> Unit,
+    onReadPdfClick: (bibcode: String, pdfFilePath: String, paperTitle: String) -> Unit = { _, _, _ -> },
     viewModel: PaperDetailsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -130,14 +132,21 @@ fun PaperDetailsScreen(
                     ) {
                         Button(
                             onClick = { 
-                                val url = paper.pdfUrl ?: "https://ui.adsabs.harvard.edu/abs/${paper.bibcode}"
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                context.startActivity(intent)
+                                val localFile = java.io.File(context.filesDir, "pdfs/${paper.bibcode}.pdf")
+                                if (localFile.exists()) {
+                                    onReadPdfClick(paper.bibcode, localFile.absolutePath, paper.title)
+                                } else if (!paper.pdfUrl.isNullOrBlank()) {
+                                    viewModel.downloadAndOpenPdf(context, paper, onReadPdfClick)
+                                } else {
+                                    val url = "https://ui.adsabs.harvard.edu/abs/${paper.bibcode}"
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                    context.startActivity(intent)
+                                }
                             },
                             modifier = Modifier.weight(1f).height(48.dp),
                             shape = MaterialTheme.shapes.medium
                         ) {
-                            Icon(Icons.AutoMirrored.Outlined.Launch, contentDescription = null)
+                            Icon(Icons.Outlined.Description, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Read PDF", fontWeight = FontWeight.SemiBold)
                         }

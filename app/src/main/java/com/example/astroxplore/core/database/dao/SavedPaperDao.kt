@@ -1,6 +1,7 @@
 package com.example.astroxplore.core.database.dao
 
 import androidx.room.*
+import com.example.astroxplore.core.database.entity.DownloadState
 import com.example.astroxplore.core.database.entity.SavedPaperEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -8,6 +9,9 @@ import kotlinx.coroutines.flow.Flow
 interface SavedPaperDao {
     @Query("SELECT * FROM saved_papers ORDER BY savedAt DESC")
     fun getAllSavedPapers(): Flow<List<SavedPaperEntity>>
+
+    @Query("SELECT * FROM saved_papers WHERE bibcode = :bibcode")
+    suspend fun getPaperByBibcode(bibcode: String): SavedPaperEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun savePaper(paper: SavedPaperEntity)
@@ -26,4 +30,13 @@ interface SavedPaperDao {
 
     @Query("SELECT COALESCE(SUM(citationCount), 0) FROM saved_papers")
     fun getTotalCitationsTracked(): Flow<Int>
+
+    @Query("UPDATE saved_papers SET downloadState = :state, downloadProgress = :progress WHERE bibcode = :bibcode")
+    suspend fun updateDownloadProgress(bibcode: String, state: DownloadState, progress: Int)
+
+    @Query("UPDATE saved_papers SET downloadState = :state, localFilePath = :filePath, fileSizeBytes = :fileSize, downloadProgress = 100 WHERE bibcode = :bibcode")
+    suspend fun markDownloadComplete(bibcode: String, state: DownloadState, filePath: String, fileSize: Long)
+
+    @Query("UPDATE saved_papers SET downloadState = 'NOT_DOWNLOADED', localFilePath = NULL, fileSizeBytes = 0, downloadProgress = 0")
+    suspend fun clearAllLocalPdfs()
 }

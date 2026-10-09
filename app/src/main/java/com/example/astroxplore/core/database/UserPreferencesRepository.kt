@@ -72,6 +72,18 @@ class UserPreferencesRepository @Inject constructor(
         }
     }
 
+    suspend fun getCacheSizeBytes(): Long = withContext(Dispatchers.IO) {
+        try {
+            var sizeBytes = getFolderSize(context.cacheDir)
+            context.externalCacheDir?.let {
+                sizeBytes += getFolderSize(it)
+            }
+            sizeBytes
+        } catch (_: Exception) {
+            0L
+        }
+    }
+
     suspend fun clearOfflineCache() = withContext(Dispatchers.IO) {
         try {
             appDatabase.feedPaperDao().clearFeed()

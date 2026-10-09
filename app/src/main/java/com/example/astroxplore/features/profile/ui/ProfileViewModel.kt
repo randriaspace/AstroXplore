@@ -1,16 +1,20 @@
 package com.example.astroxplore.features.profile.ui
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.astroxplore.core.database.ThemeMode
 import com.example.astroxplore.core.database.UserPreferencesRepository
 import com.example.astroxplore.features.auth.data.AuthRepository
+import com.example.astroxplore.features.library.data.LibraryRepository
 import com.example.astroxplore.features.profile.data.ProfileRepository
 import com.example.astroxplore.features.profile.data.remote.dto.UserProfileDto
 import com.example.astroxplore.features.profile.data.remote.dto.toDto
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.Locale
 import javax.inject.Inject
 
 data class ProfileUiState(
@@ -32,7 +36,9 @@ data class ProfileUiState(
 class ProfileViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val libraryRepository: LibraryRepository,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _userProfile = MutableStateFlow<UserProfileDto?>(null)
@@ -154,12 +160,21 @@ class ProfileViewModel @Inject constructor(
     fun clearCache() {
         viewModelScope.launch {
             userPreferencesRepository.clearOfflineCache()
+            libraryRepository.clearLocalPdfCache(context)
             updateCacheSize()
         }
     }
 
     private suspend fun updateCacheSize() {
-        _cacheSize.value = userPreferencesRepository.getCacheSizeMb()
+        val prefsSize = userPreferencesRepository.getCacheSizeBytes()
+        val pdfSize = libraryRepository.getLocalPdfCacheSizeBytes(context)
+        val totalBytes = prefsSize + pdfSize
+        val formatted = if (totalBytes < 1024 * 1024) {
+            "${totalBytes / 1024} KB"
+        } else {
+            String.format(Locale.US, "%.1f MB", totalBytes.toFloat() / (1024 * 1024))
+        }
+        _cacheSize.value = formatted
     }
 
     fun setShowLogoutDialog(show: Boolean) {

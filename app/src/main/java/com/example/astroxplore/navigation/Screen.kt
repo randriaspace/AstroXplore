@@ -48,4 +48,11 @@ public sealed interface Screen {
 
     @Serializable
     data class GroupDetails(val groupId: String) : Screen
+
+    @Serializable
+    data class PdfViewer(
+        val bibcode: String,
+        val pdfFilePath: String,
+        val paperTitle: String
+    ) : Screen
 }
