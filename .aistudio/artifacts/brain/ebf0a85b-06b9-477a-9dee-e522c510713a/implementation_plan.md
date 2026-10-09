@@ -1,27 +1,27 @@
-# Material 3 Progress Indicators Implementation Plan
+# PDF Reader & External Paper Flow Implementation Plan
 
-Adopt the official [Material Design 3 Progress Indicators Guidelines](https://m3.material.io/components/progress-indicators/guidelines) across AstroXplore, delivering high-precision linear and circular progress indicators featuring continuous visible tracks, rounded stroke caps, and seamless transitions from indeterminate connection phases to determinate percentage tracking.
+Enhance the publication reading flow in AstroXplore to distinguish between downloadable PDFs and external publisher links, ensure the action button is disabled while downloading and auto-opens the PDF reader upon completion, and equip the PDF viewer with floating zoom controls, page scrubber, and native Android printing.
 
 ---
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> Based on your selected preferences and the Material 3 guidelines:
-> - **Indicator Placement**: Docked linear progress bars directly under Top App Bars across Feed, Library, and Explore, paired with circular indicators on cards and download actions.
-> - **Indeterminate-to-Determinate Dynamic Transition**: Indicators start in indeterminate motion while negotiating network streams, then smoothly transition into determinate percentage progress as bytes download.
-> - **Track Geometry & Styling**: Distinct, contrasting background track (`surfaceVariant`) with rounded stroke ends (`StrokeCap.Round`) and M3 standard easing transitions.
+> The following architectural decisions were confirmed based on your requirements:
+> - **External vs. Downloadable Flow**: If a paper does not have a downloadable PDF link, the primary action button adapts to **"Open Publisher Link"** with an external link icon (`OpenInNew`) to launch the publisher / ADS web portal.
+> - **Download Button Lock & Auto-Open**: While downloading, the "Read PDF" button is non-clickable (`enabled = false`) and displays the Material 3 progress indicator. As soon as the download finishes, the app **automatically opens the PDF reader**.
+> - **PDF Viewer Toolkit**: Equipped with floating zoom controls (`+`, `-`, reset to 100%), pinch-to-zoom, a page scrubber slider (`Page X of Y`), and a top-app-bar **Print** action using Android `PrintManager`.
 
 ---
 
 ## 1. Overview & Core Concept
 
-- **What It Does**: Implements official Material 3 Progress Indicators in Jetpack Compose, replacing basic spinners with track-anchored indicators. Provides instant visual feedback on progress state (connecting vs. active downloading) across paper fetching, offline PDF caching, and journal club syncing.
-- **Target Audience / Persona**: Researchers downloading high-density astrophysics preprints and syncing collections, who need clear visual confirmation of download speed and remaining wait times.
-- **Key Value**: 
-  - Immediate feedback with visible track rings that demonstrate total capacity.
-  - Zero jarring jumps between connecting and downloading states.
-  - Consistent adherence to the Material Design 3 Progress Indicator guidelines.
+- **What It Does**: Refines the primary action button in `PaperDetailsScreen` to provide appropriate affordances based on whether the paper has an open-access PDF (arXiv) or only an external publisher identifier (DOI / ADS). Eliminates tap confusion during background downloads by locking the button and auto-transitioning to the reader once downloaded. Enriches `PdfViewerScreen` with zoom, page navigation, and document printing.
+- **Target Audience / Persona**: Astrophysicists reading dense multi-page preprints who need to inspect figures with zoom, print research documents, and easily open paywalled or publisher articles.
+- **Key Value**:
+  - Clear user expectations: users know immediately if a paper can be read offline or needs an external browser.
+  - Zero friction: no need to tap "Read Offline" again after waiting for a download to finish.
+  - Full reading utility: zoom in on charts/equations, jump through pages, and print directly from the device.
 
 ---
 
@@ -29,77 +29,88 @@ Adopt the official [Material Design 3 Progress Indicators Guidelines](https://m3
 
 ### Key User Flows
 
-1. **Top App Bar Docked Linear Progress**:
-   - In `LibraryScreen`, `FeedScreen`, and `ExploreScreen`, when a refresh or sync is triggered, a sleek 4dp rounded linear progress bar appears flush against the bottom of the TopAppBar.
-   - The bar has a continuous track in `surfaceVariant` with a `primary` indicator flowing along it with rounded caps.
-   - It animates out cleanly with a fade transition when the operation completes.
+1. **Paper Details Action Flow**:
+   - **Case A: Downloadable PDF (Not Downloaded Yet)**:
+     - Button displays `[Download PDF / Read PDF]` in primary color.
+     - User taps button: triggers `downloadPaperWorker`.
+     - Button immediately disables (`enabled = false`), transitioning to M3 progress tracking: `"Connecting..."` -> `"Saving (X%)"`.
+     - Once complete, `LaunchedEffect` detects completion and **automatically opens the PDF Viewer**.
+   - **Case B: Downloadable PDF (Already Cached)**:
+     - Button displays `[Read Offline]` with a checkmark badge. Tapping opens the viewer immediately.
+   - **Case C: External Link Only (No PDF URL)**:
+     - Button adapts to `[Open Publisher Link]` with `Icons.AutoMirrored.Outlined.OpenInNew`.
+     - Tapping opens the DOI or NASA ADS link in the system browser or custom tab.
 
-2. **Paper Download & PDF Viewer Progress**:
-   - In `PaperDetailsScreen` and `PdfViewerScreen`:
-     - **Phase 1 (Connecting)**: While establishing the OkHttp connection or querying arXiv, the circular indicator moves along a fixed visible track in indeterminate mode.
-     - **Phase 2 (Streaming)**: As `DownloadPaperWorker` streams bytes, the indicator smoothly switches to determinate mode, filling the circular track from 0% to 100% with animated progress and percentage typography.
-     - **Phase 3 (Completion)**: Replaces with a checkmark badge and ready status.
-
-3. **Card-Level Circular Indicators**:
-   - In list items (`ExpandedLibraryListItem`, `PaperCard`), download status pills display a 20dp compact circular progress indicator with track background and rounded caps.
-
-### Visual Tokens & Specs
-- **Indicator Color**: `MaterialTheme.colorScheme.primary`
-- **Track Color**: `MaterialTheme.colorScheme.surfaceVariant` (contrasting, clearly visible)
-- **Stroke Cap**: `StrokeCap.Round`
-- **Linear Bar Height**: 4dp with 2dp corner rounding
-- **Circular Sizes**: 
-  - Compact / Card: 20dp (stroke 2.5dp)
-  - Medium / Action Dock: 36dp (stroke 3.5dp)
-  - Large / Reader: 56dp (stroke 4.5dp)
+2. **Enhanced PDF Viewer (`PdfViewerScreen`)**:
+   - **Top App Bar**:
+     - Document title and "Offline Storage" chip.
+     - **Print Action** (`Icons.Outlined.Print`): invokes Android `PrintManager` using standard `PrintDocumentAdapter`.
+     - **Share Action** (`Icons.Default.Share`): shares PDF file via `FileProvider`.
+   - **Reader Canvas**:
+     - Pinch-to-zoom gesture and double-tap reset.
+     - Page list renders smoothly with zoomed resolution.
+   - **Floating Zoom Controls**:
+     - Compact pill in bottom-right with Zoom Out (`-`), Current Zoom (`100%` / `150%`), and Zoom In (`+`).
+   - **Page Scrubber**:
+     - Bottom bar showing `Page 3 of 28` with a discrete slider for jumping across long papers.
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-- **Decision 1: Unified Dual-Mode Indicator (`AstroM3ProgressIndicator`)**
-  - *Chosen Approach*: Build a unified component supporting both `progress = null` (indeterminate) and `progress = Float` (determinate) with animated cross-fades between the two states.
-  - *Why*: Eliminates code duplication and allows screens to seamlessly switch states without recreating or recomposing layout nodes.
-  - *Alternatives Considered*: Separate disconnected components for determinate and indeterminate (rejected because state transitions would flicker).
+- **Decision 1: Native Android `PrintManager` vs. Third-Party PDF Exporters**
+  - *Chosen Approach*: Implement a lightweight custom `PrintDocumentAdapter` passing the local cached PDF file directly to Android's system `PrintManager`.
+  - *Why*: Zero third-party dependencies, supports physical WiFi printers, Save-as-PDF, and Google Cloud Print with 100% standard OS compliance.
+  - *Alternatives Considered*: Opening an external PDF viewer app to print (rejected because it forces the user out of AstroXplore).
 
-- **Decision 2: Top App Bar Linear Docking Pattern**
-  - *Chosen Approach*: Dock `AstroM3DockedLinearProgress` directly beneath `TopAppBar` within `Scaffold` top bar slots.
-  - *Why*: Perfectly matches the M3 guidelines showcased in your screenshot (`Episodes` top app bar reference) without shifting content or obscuring lists.
-  - *Alternatives Considered*: Floating progress banner or bottom bar progress (rejected in favor of the official M3 TopAppBar docking standard).
+- **Decision 2: Automatic Transition on Download Finish**
+  - *Chosen Approach*: Observe `downloadState` in `PaperDetailsScreen`. When `downloadState` transitions from `DOWNLOADING` to `DOWNLOADED` while the screen is active, trigger `onReadPdfClick` automatically.
+  - *Why*: Directly addresses user feedback that clicking during download is impossible and makes the download-to-read transition completely seamless.
 
 ---
 
 ## 4. Technical Architecture & Component Flow
 
 ```
-┌────────────────────────────────────────────────────────┐
-│                   AstroXplore Top Bar                  │
-└──────────────────────────┬─────────────────────────────┘
-                           │
-             ┌─────────────▼─────────────┐
-             │ AstroM3DockedLinearProgress│
-             │   (Rounded Caps & Track)  │
-             └─────────────┬─────────────┘
-                           │
-             ┌─────────────┴─────────────┐
-             │   Indeterminate / Wait    │
-             │ (Connecting to arXiv API) │
-             └─────────────┬─────────────┘
-                           │ Stream begins (contentLength known)
-             ┌─────────────▼─────────────┐
-             │    Determinate Progress   │
-             │   (Smooth animated 0-100%)│
-             └───────────────────────────┘
+                     ┌───────────────────────────────┐
+                     │     Paper Details Screen      │
+                     └───────────────┬───────────────┘
+                                     │
+                    Has PDF URL? ────┴──── No PDF URL?
+                   /                                   \
+                  ▼                                     ▼
+        ┌───────────────────┐                 ┌───────────────────┐
+        │ [Read / Save PDF] │                 │ [Open Publisher]  │
+        └─────────┬─────────┘                 └─────────┬─────────┘
+                  │ Tapped                              │ Tapped
+                  ▼                                     ▼
+        ┌───────────────────┐                 ┌───────────────────┐
+        │ Button Disabled & │                 │ Open Browser / ADS│
+        │ M3 Progress Bar   │                 └───────────────────┘
+        └─────────┬─────────┘
+                  │ Download Complete
+                  ▼
+        ┌───────────────────┐
+        │ Auto-Open Reader  │
+        └─────────┬─────────┘
+                  ▼
+        ┌────────────────────────────────────────────────────────┐
+        │                   PdfViewerScreen                      │
+        │  [Print Icon]  [Share Icon]  [Pinch & Floating Zoom]   │
+        │                  [Page Scrubber]                       │
+        └────────────────────────────────────────────────────────┘
 ```
 
 ### Planned File Edits
-1. **`core/ui/components/AstroLoadingIndicators.kt`**:
-   - Add `AstroM3CircularProgressIndicator`: Dual-mode (determinate & indeterminate) with contrasting track and rounded ends.
-   - Add `AstroM3DockedLinearProgress`: Top app bar docked linear indicator with track and animated progress.
-   - Add `AstroCompactProgressBadge`: Inline card-level progress indicator.
-2. **`features/feed/ui/PaperDetailsScreen.kt` & `PrimaryActionDock.kt`**:
-   - Wire the dual-mode progress indicator to the PDF download state (transitioning from indeterminate connecting to determinate percentage).
-3. **`features/library/ui/LibraryScreen.kt`**:
-   - Dock `AstroM3DockedLinearProgress` below the library top app bar during sync operations.
-4. **`features/library/ui/PdfViewerScreen.kt`**:
-   - Integrate the determinate circular progress indicator showing numeric percentage during file retrieval.
+1. **`core/ui/components/PrimaryActionDock.kt`**:
+   - Add support for `hasPdfUrl: Boolean`.
+   - When `!hasPdfUrl`: render "Open Publisher" with `Icons.AutoMirrored.Outlined.OpenInNew`.
+   - When `downloadState == DownloadState.DOWNLOADING`: disable button (`enabled = false`) and render M3 progress.
+2. **`features/feed/ui/PaperDetailsScreen.kt`**:
+   - Pass `hasPdfUrl = !paper.pdfUrl.isNullOrBlank()` to `PrimaryActionDock`.
+   - Add `LaunchedEffect(downloadState)` to automatically open `onReadPdfClick` when download completes.
+3. **`features/library/ui/PdfViewerScreen.kt`**:
+   - Add floating zoom controls (`+`, `-`, reset).
+   - Implement pinch-to-zoom using `graphicsLayer` scale and translation.
+   - Add page scrubber slider.
+   - Implement `printPdfDocument(context, file)` using Android `PrintManager`.

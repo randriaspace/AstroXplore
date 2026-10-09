@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan to adopt official Material 3 Progress Indicators (m3.material.io/components/progress-indicators/guidelines) across AstroXplore, featuring top app bar docked linear indicators, circular card indicators with contrasting tracks, and dynamic transitions from indeterminate to determinate progress during downloads and syncs.",
-  "updatedAt":  "2026-10-09T12:18:58.761382075Z",
+  "summary":  "Implementation plan to manage paper reading user flows (downloadable PDF vs. external publisher link), prevent double-taps during download with automatic reader launch upon completion, and enhance the PDF viewer with floating zoom controls, page scrubber, and native Android print support.",
+  "updatedAt":  "2026-10-09T12:55:38.322434718Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

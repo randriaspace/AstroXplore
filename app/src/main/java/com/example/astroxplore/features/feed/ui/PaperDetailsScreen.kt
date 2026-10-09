@@ -39,6 +39,7 @@ import com.example.astroxplore.core.ui.components.PrimaryActionDock
 import com.example.astroxplore.features.feed.model.PaperModel
 import com.example.astroxplore.features.feed.ui.components.*
 import com.example.astroxplore.features.groups.ui.components.GroupPickerSheet
+import com.example.astroxplore.core.database.entity.DownloadState
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -62,6 +63,7 @@ fun PaperDetailsScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var showGroupPicker by remember { mutableStateOf(false) }
+    var userInitiatedDownload by remember { mutableStateOf(false) }
 
     BackHandler {
         if (showGroupPicker) {
@@ -73,6 +75,22 @@ fun PaperDetailsScreen(
 
     LaunchedEffect(bibcode) {
         viewModel.loadPaper(bibcode)
+    }
+
+    // Automatically open the PDF reader once download completes
+    LaunchedEffect(downloadState, localFilePath) {
+        if (userInitiatedDownload && downloadState == DownloadState.DOWNLOADED && uiState is PaperDetailsUiState.Success) {
+            val paper = (uiState as PaperDetailsUiState.Success).paper
+            val targetFile = if (!localFilePath.isNullOrBlank()) {
+                File(localFilePath!!)
+            } else {
+                File(context.filesDir, "pdfs/${paper.bibcode}.pdf")
+            }
+            if (targetFile.exists()) {
+                userInitiatedDownload = false
+                onReadPdfClick(paper.bibcode, targetFile.absolutePath, paper.title)
+            }
+        }
     }
 
     Scaffold(
@@ -135,6 +153,8 @@ fun PaperDetailsScreen(
         bottomBar = {
             if (uiState is PaperDetailsUiState.Success) {
                 val paper = (uiState as PaperDetailsUiState.Success).paper
+                val hasPdfUrl = !paper.pdfUrl.isNullOrBlank()
+
                 PrimaryActionDock(
                     onReadPdfClick = {
                         val localFile = if (!localFilePath.isNullOrBlank()) {
@@ -145,9 +165,11 @@ fun PaperDetailsScreen(
 
                         if (localFile.exists()) {
                             onReadPdfClick(paper.bibcode, localFile.absolutePath, paper.title)
-                        } else if (!paper.pdfUrl.isNullOrBlank()) {
+                        } else if (hasPdfUrl) {
+                            userInitiatedDownload = true
                             viewModel.downloadAndOpenPdf(context, paper, onReadPdfClick)
                         } else {
+                            // Direct user to external publisher / NASA ADS link
                             val url = "https://ui.adsabs.harvard.edu/abs/${paper.bibcode}"
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                             context.startActivity(intent)
@@ -156,6 +178,7 @@ fun PaperDetailsScreen(
                     onSecondaryActionClick = { showGroupPicker = true },
                     downloadState = downloadState,
                     downloadProgress = downloadProgress,
+                    hasPdfUrl = hasPdfUrl,
                     secondaryButtonText = "Journal Club",
                     secondaryButtonIcon = Icons.Outlined.Groups
                 )
