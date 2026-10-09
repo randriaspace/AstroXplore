@@ -13,6 +13,9 @@ interface SavedPaperDao {
     @Query("SELECT * FROM saved_papers WHERE bibcode = :bibcode")
     suspend fun getPaperByBibcode(bibcode: String): SavedPaperEntity?
 
+    @Query("SELECT * FROM saved_papers WHERE bibcode = :bibcode")
+    fun observeSavedPaper(bibcode: String): Flow<SavedPaperEntity?>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun savePaper(paper: SavedPaperEntity)
 

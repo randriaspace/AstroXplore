@@ -52,6 +52,8 @@ class LibraryRepository @Inject constructor(
 
     fun isPaperSaved(bibcode: String): Flow<Boolean> = savedPaperDao.isPaperSaved(bibcode)
 
+    fun observeSavedPaper(bibcode: String): Flow<SavedPaperEntity?> = savedPaperDao.observeSavedPaper(bibcode)
+
     suspend fun getPaperEntity(bibcode: String): SavedPaperEntity? = savedPaperDao.getPaperByBibcode(bibcode)
 
     suspend fun toggleSave(paper: PaperModel) = withContext(Dispatchers.IO) {

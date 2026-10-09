@@ -27,6 +27,15 @@ class PaperDetailsViewModel @Inject constructor(
     private val _isSaved = MutableStateFlow(false)
     val isSaved: StateFlow<Boolean> = _isSaved.asStateFlow()
 
+    private val _downloadState = MutableStateFlow(com.example.astroxplore.core.database.entity.DownloadState.NOT_DOWNLOADED)
+    val downloadState: StateFlow<com.example.astroxplore.core.database.entity.DownloadState> = _downloadState.asStateFlow()
+
+    private val _downloadProgress = MutableStateFlow(0)
+    val downloadProgress: StateFlow<Int> = _downloadProgress.asStateFlow()
+
+    private val _localFilePath = MutableStateFlow<String?>(null)
+    val localFilePath: StateFlow<String?> = _localFilePath.asStateFlow()
+
     // Offline-First: Reactively observe user groups
     val userGroups: StateFlow<List<GroupModel>> = groupRepository.getLocalGroups()
         .stateIn(
@@ -65,6 +74,14 @@ class PaperDetailsViewModel @Inject constructor(
     private fun observeSavedState(bibcode: String) {
         libraryRepository.isPaperSaved(bibcode)
             .onEach { _isSaved.value = it }
+            .launchIn(viewModelScope)
+
+        libraryRepository.observeSavedPaper(bibcode)
+            .onEach { entity ->
+                _downloadState.value = entity?.downloadState ?: com.example.astroxplore.core.database.entity.DownloadState.NOT_DOWNLOADED
+                _downloadProgress.value = entity?.downloadProgress ?: 0
+                _localFilePath.value = entity?.localFilePath
+            }
             .launchIn(viewModelScope)
     }
 
