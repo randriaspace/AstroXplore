@@ -107,7 +107,7 @@ dependencies {
 
     implementation(libs.latex.renderer)
     implementation(libs.zxing.core)
-    implementation(libs.lottie.compose)
+    // implementation(libs.lottie.compose) // Removed in favor of native Material 3 loading indicators
 
     // CameraX
     implementation(libs.androidx.camera.core)

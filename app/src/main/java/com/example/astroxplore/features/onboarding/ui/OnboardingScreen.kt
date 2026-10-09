@@ -31,7 +31,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.astroxplore.R
-import com.example.astroxplore.core.ui.components.LottieLoadingView
+import com.example.astroxplore.core.ui.components.AstroLoadingSize
+import com.example.astroxplore.core.ui.components.AstroM3LoadingIndicator
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -222,10 +223,15 @@ fun OnboardingScreen(
 
     if (isLoading) {
         Box(
-            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background.copy(alpha = 0.7f)),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.85f)),
             contentAlignment = Alignment.Center
         ) {
-            LottieLoadingView(size = 200)
+            AstroM3LoadingIndicator(
+                size = AstroLoadingSize.LARGE,
+                label = "Configuring your research feed..."
+            )
         }
     }
 }

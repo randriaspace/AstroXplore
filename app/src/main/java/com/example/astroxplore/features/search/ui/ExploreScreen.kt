@@ -38,7 +38,6 @@ import com.example.astroxplore.features.feed.model.PaperModel
 import com.example.astroxplore.features.feed.ui.components.PaperCard
 import com.example.astroxplore.features.feed.ui.components.PaperDetailsBottomSheet
 import com.example.astroxplore.features.feed.ui.components.PaperCardSkeleton
-import com.example.astroxplore.core.ui.components.LottieLoadingView
 import com.example.astroxplore.core.ui.components.OfflineFallbackState
 
 private val QUICK_DISCOVERY_TOPICS = listOf(

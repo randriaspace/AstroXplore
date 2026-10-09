@@ -32,9 +32,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.example.astroxplore.core.ui.components.AstroDetailsSkeleton
 import com.example.astroxplore.core.ui.components.AstroTabItem
 import com.example.astroxplore.core.ui.components.AstroTabRow
-import com.example.astroxplore.core.ui.components.LottieLoadingView
 import com.example.astroxplore.core.ui.components.PrimaryActionDock
 import com.example.astroxplore.features.feed.model.PaperModel
 import com.example.astroxplore.features.feed.ui.components.*
@@ -169,9 +169,7 @@ fun PaperDetailsScreen(
         ) {
             when (val state = uiState) {
                 is PaperDetailsUiState.Loading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        LottieLoadingView(size = 140)
-                    }
+                    AstroDetailsSkeleton()
                 }
                 is PaperDetailsUiState.Success -> {
                     PaperDetailsMainContent(

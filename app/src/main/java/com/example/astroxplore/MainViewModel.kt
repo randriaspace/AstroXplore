@@ -55,21 +55,32 @@ class MainViewModel @Inject constructor(
                     val localProfile = if (userId.isNotBlank()) profileRepository.getLocalProfile(userId).firstOrNull() else null
                     val isLocallyOnboarded = isLocalDataStoreOnboarded || (localProfile?.isOnboarded == true)
 
-                    // Emit local onboarding status immediately
-                    _isOnboarded.value = isLocallyOnboarded
-
-                    if (isOnline.value && userId.isNotBlank()) {
-                        syncAll(userId)
+                    if (isLocallyOnboarded) {
+                        _isOnboarded.value = true
+                        if (isOnline.value && userId.isNotBlank()) {
+                            syncAll(userId)
+                        }
+                    } else {
+                        // Check remote profile with quick timeout if online before concluding false
+                        var remoteOnboarded = false
+                        if (isOnline.value && userId.isNotBlank()) {
+                            try {
+                                val profile = kotlinx.coroutines.withTimeoutOrNull(2000L) {
+                                    profileRepository.getProfile(userId)
+                                }
+                                remoteOnboarded = profile?.isOnboarded == true
+                            } catch (_: Exception) {
+                            }
+                        }
+                        val finalOnboarded = remoteOnboarded
+                        _isOnboarded.value = finalOnboarded
+                        if (finalOnboarded) {
+                            settingsRepository.setOnboardingComplete(true)
+                            if (isOnline.value && userId.isNotBlank()) {
+                                syncAll(userId)
+                            }
+                        }
                     }
-
-                    // 2. Perform background check with remote profile
-                    val profile = if (userId.isNotBlank()) profileRepository.getProfile(userId) else null
-                    val isRemoteOnboarded = profile?.isOnboarded == true
-
-                    // Once onboarded, preserve onboarded status locally and remotely
-                    val finalOnboarded = isLocallyOnboarded || isRemoteOnboarded
-                    _isOnboarded.value = finalOnboarded
-                    settingsRepository.setOnboardingComplete(finalOnboarded)
                 } else {
                     _isOnboarded.value = null
                 }

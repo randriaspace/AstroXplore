@@ -30,7 +30,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.astroxplore.R
 import com.example.astroxplore.features.groups.ui.components.QrCodeScannerSheet
-import com.example.astroxplore.core.ui.components.LottieLoadingView
+import com.example.astroxplore.core.ui.components.AstroLoadingSize
+import com.example.astroxplore.core.ui.components.AstroM3LoadingIndicator
 import com.example.astroxplore.features.groups.model.GroupModel
 import kotlinx.coroutines.flow.collectLatest
 
@@ -152,7 +153,10 @@ fun GroupsScreen(
             when (val state = uiState) {
                 is GroupsUiState.Loading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        LottieLoadingView(size = 180, resId = R.raw.book_loader)
+                        AstroM3LoadingIndicator(
+                            size = AstroLoadingSize.LARGE,
+                            label = "Loading journal clubs..."
+                        )
                     }
                 }
                 is GroupsUiState.Success -> {

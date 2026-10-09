@@ -41,7 +41,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.astroxplore.R
-import com.example.astroxplore.core.ui.components.LottieLoadingView
+import com.example.astroxplore.core.ui.components.AstroLoadingSize
+import com.example.astroxplore.core.ui.components.AstroM3LoadingIndicator
 import com.example.astroxplore.core.util.QrCodeUtils
 import com.example.astroxplore.features.feed.model.PaperModel
 import com.example.astroxplore.features.feed.ui.components.PaperCard
@@ -276,7 +277,10 @@ fun GroupDetailsScreen(
                         }
                         is GroupDetailsUiState.Loading -> {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                LottieLoadingView(size = 150, resId = R.raw.book_loader)
+                                AstroM3LoadingIndicator(
+                                    size = AstroLoadingSize.LARGE,
+                                    label = "Loading discussions..."
+                                )
                             }
                         }
                         is GroupDetailsUiState.Error -> {
@@ -452,7 +456,12 @@ fun ShelfTab(
     Box(modifier = Modifier.fillMaxSize()) {
         when (uiState) {
             is GroupDetailsUiState.Loading -> {
-                LottieLoadingView(size = 150, resId = R.raw.book_loader)
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    AstroM3LoadingIndicator(
+                        size = AstroLoadingSize.LARGE,
+                        label = "Loading papers..."
+                    )
+                }
             }
             is GroupDetailsUiState.Success -> {
                 LazyColumn(

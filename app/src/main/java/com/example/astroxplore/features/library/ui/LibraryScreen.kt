@@ -29,7 +29,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import com.example.astroxplore.core.ui.components.LottieLoadingView
+import com.example.astroxplore.core.ui.components.AstroLinearProgressBar
+import com.example.astroxplore.core.ui.components.AstroPaperCardSkeleton
 import com.example.astroxplore.features.feed.model.PaperModel
 import kotlinx.coroutines.launch
 
@@ -273,7 +274,16 @@ fun LibraryScreen(
                 .padding(innerPadding)
         ) {
             if (isRefreshing && papers.isEmpty()) {
-                LottieLoadingView(size = 150)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    repeat(4) {
+                        AstroPaperCardSkeleton()
+                    }
+                }
             } else if (papers.isEmpty()) {
                 EmptyLibraryState(
                     onExploreClick = onExploreClick,

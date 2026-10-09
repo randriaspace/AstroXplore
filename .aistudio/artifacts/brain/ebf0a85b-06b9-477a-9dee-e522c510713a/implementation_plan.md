@@ -1,131 +1,114 @@
-# Google-Class Polish & Modular Paper Details Reader
+# Modern Material 3 Loading System & Seamless Startup Plan
 
-Elevate AstroXplore to a world-class Google-grade reading and research application by redesigning the Paper Details experience into an elegant, clean reader with interactive tabs and collapsible metadata, while extracting a comprehensive atomic design component suite for reuse across the entire app.
+Modernize all loading states, progress indicators, and transitions across AstroXplore to adhere to official Material Design 3 guidelines (m3.material.io/components/loading-indicator), replace legacy Lottie dependencies with native Compose M3 animations, implement expressive skeleton shimmer placeholders, and eliminate the startup onboarding flash.
 
-### User Review & Critical Decisions
+## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following directions were confirmed during interactive clarification and will govern the implementation upon your approval:
-
-- **Confirmed Polish Priority**: Paper Details experience overhauled with a prominent hero header, fluid tabbed navigation (Overview, Citations & Metrics, BibTeX/Export), and quick bottom action dock.
-- **Confirmed Component Strategy**: Dedicated shared UI package (`core.ui.components` and `core.ui.widgets`) housing atomic, reusable building blocks to eliminate duplicated code and keep files maintainable under 500 lines.
-- **Confirmed Reader Layout**: Clean academic reader typography with collapsible metadata sections (authors list expander, journal details accordion, and interactive citation badges).
-
----
-
-### 1. Overview & Core Concept
-
-- **What It Does**: Transforms scientific paper browsing from dense text walls into a polished, distraction-free reading sanctuary inspired by Google Scholar and Google Play Books. Users can fluidly toggle between an executive summary, metrics/citations, and metadata, interact with copy/share/group utilities, and launch local offline PDFs or web preprints.
-- **Target Audience / Persona**: Astrophysicists, astronomy students, and space science enthusiasts who need to rapidly assess papers, examine citations, share to journal reading clubs, and read preprints without friction or visual clutter.
-- **Key Value**: Delivers instantaneous clarity through clean hierarchy, eliminates long monolithic source files by breaking views into testable reusable widgets, and guarantees standard 60fps edge-to-edge responsiveness.
+> The following architectural decisions were confirmed based on your requirements:
+> - **Loading Indicator Aesthetic**: Expressive M3 circular and linear indicators paired with layout-matching skeleton shimmer placeholders for content screens.
+> - **Zero-Flash Startup Engine**: Splash screen is held securely until both authentication status and onboarding persistence fully resolve before mounting the navigation host.
+> - **Background Operation Feedback**: Top app bar indeterminate linear progress indicators with subtle snackbars for syncing, pulling, and pushing data.
+> - **Lottie Phase-Out**: Complete removal of Lottie loading assets in favor of pure, lightweight, theme-aware Jetpack Compose M3 animations.
 
 ---
 
-### 2. User Experience & Visual Design
+## 1. Overview & Core Concept
 
-#### Key User Flows
-1. **Paper Discovery to Deep Dive**: Tapping any paper card in the feed, search, or library performs an edge-to-edge transition into the Paper Details screen.
-2. **Hero Overview & Quick Navigation**: The top bar displays clean back navigation, favorite/bookmark toggle, and share action. Right below, a streamlined publication card highlights the date, category badge, paper title (with full LaTeX formula rendering), and expandable author list.
-3. **Tabbed Content Navigation**:
-   - **Overview Tab**: Key highlights, citation badges, collapsible full abstract with smooth animated expansion, and journal club discussions.
-   - **Citations & Metrics Tab**: Citation count analytics, bibcode/arXiv references, external ADS links, and citation graph context.
-   - **BibTeX & Export Tab**: Formatted code block with single-tap clipboard copy, customizable export formats, and share sheet triggers.
-4. **Docked Primary Action Bar**: A floating, elevated bottom bar offering persistent 1-tap "Read PDF" (with automatic download / offline cached opening) and "Add to Journal Club" actions.
-
-#### Visual Identity & Theme
-- **Aesthetic Direction**: Academic clarity combined with Google Material 3 precision. Utilitarian elegance with generous breathing room, high contrast labels, and crisp typography.
-- **Color Palette & Mood**: 
-  - Accent: Twitter Blue (`#1D9BF0`) / Deep Cosmic Blue (`#0B57D0`) as primary action colors.
-  - Surfaces: M3 dynamic container tiers (`surfaceContainerLow`, `surfaceContainer`, `surfaceContainerHigh`) ensuring clean visual separation without hard borders.
-  - Badges & Chips: Subtle semi-transparent tonal tints for arXiv and category identifiers.
-- **Typography & Hierarchy**:
-  - Paper Titles: `titleLarge` / `headlineSmall` (bold, line height 28–32sp) with sub/superscript formatting.
-  - Section Headers: `labelLarge` uppercase tracking (1.2sp letter spacing) in primary color.
-  - Body / Abstract: `bodyLarge` (line height 24sp) with comfortable contrast for long reading sessions.
-- **Component Styling & Layout**:
-  - 16dp and 20dp rounded corners following modern M3 shapes.
-  - Edge-to-edge insets handled via `safeDrawing` and `navigationBarsPadding`.
-
-#### Interactive Feedback & Motion
-- Smooth tab switching with `AnimatedContent` crossfade.
-- Spring animations (`spring(stiffness = Spring.StiffnessMediumLow)`) for expanding/collapsing author chips and abstract text.
-- Micro-haptic tactile feedback on copy, bookmark, and swipe actions.
+- **What It Does**: Replaces heavy third-party Lottie animations across AstroXplore with official Material 3 progress indicators and native Compose shimmer skeletons. Stabilizes the app startup lifecycle so authenticated users immediately enter the main feed without intermediate onboarding flickers.
+- **Target Audience / Persona**: Astrophysicists, researchers, and students who require fast, fluid, distraction-free navigation when browsing publications, exploring topics, and syncing offline papers.
+- **Key Value**: 
+  - Zero UI flicker on app cold start.
+  - Consistent Google-grade Material 3 motion language and tactile progress feedback.
+  - Faster render times and lower memory footprint by removing Lottie JSON decoders.
 
 ---
 
-### 3. Key Product Decisions & Trade-Offs
+## 2. User Experience & Visual Design
 
-- **Decision 1: Tabbed Reader vs Single Continuous Scroll**
-  - *Chosen Approach*: Primary content organized into 3 focused tabs (`Overview`, `Metrics`, `BibTeX`) with a sticky hero header.
-  - *Why*: Reduces cognitive load for dense 20-page astrophysics publications; users who only need BibTeX or citation metrics don't need to scroll past 6 paragraphs of abstract.
-  - *Alternatives Considered*: Infinite vertical scrolling was previously used, but created excessive page length and buried export actions.
+### Key User Flows
 
-- **Decision 2: Centralized Atomic Component Library**
-  - *Chosen Approach*: Introduce reusable widgets in `core.ui.components` and `core.ui.widgets` (`AstroTabRow`, `CollapsibleSection`, `MetadataBadgeRow`, `ActionDock`, `AuthorChipsFlow`).
-  - *Why*: Eliminates boilerplate across `FeedScreen`, `SearchScreen`, `LibraryScreen`, and `PaperDetailsScreen`, keeping individual screen files under 350 lines.
-  - *Alternatives Considered*: Inlining components per screen led to code duplication and visual inconsistencies in buttons and badges.
+1. **Cold Start & Session Settling**:
+   - The user opens the app.
+   - A branded Material 3 splash screen displays the AstroXplore identity with an elegant, modern M3 indicator.
+   - Only when **both** session authentication (`SessionStatus`) and DataStore onboarding status (`isOnboarded`) are verified does the splash gracefully cross-fade into the target screen (`Feed` for onboarded users, `Onboarding` for new users, or `Auth` for unauthenticated sessions).
+   - No flicker or intermediate navigation state is ever rendered.
 
-- **Decision 3: Seamless Offline PDF Integration**
-  - *Chosen Approach*: The primary "Read PDF" button inspects local Room cache (`SavedPaperEntity.localFilePath`) first; if cached, opens instantly via internal viewer or FileProvider; if not, triggers background streaming with linear progress.
-  - *Why*: Delivers an offline-first, instant-load experience matching world-class document readers.
+2. **Content Feed & Paper Details Loading**:
+   - When fetching recent arXiv papers or loading paper details, the screen displays a subtle **M3 Skeleton Shimmer Placeholder** matching the exact geometry of paper cards (header pill, LaTeX title bar, metadata badges, summary lines).
+   - Once data arrives, content fades in smoothly with a standard M3 easing curve (250ms).
+
+3. **Background Sync & Pull-to-Refresh Feedback**:
+   - When pulling to refresh or downloading PDF archives in the background, a discrete indeterminate **M3 LinearProgressIndicator** animates along the top app bar without obscuring content.
+   - Non-intrusive M3 snackbars communicate sync completion or offline status.
+
+### Visual Identity & Theme
+- **Color Palette**: Standard AstroXplore M3 semantic tokens (`MaterialTheme.colorScheme.primary`, `surfaceVariant`, `outlineVariant`).
+- **Shimmer Gradients**: Dynamic brush sweeping from `surfaceVariant.copy(alpha = 0.4f)` to `surfaceVariant.copy(alpha = 0.9f)` using infinite transition easing.
+- **Elevation & Radius**: M3 rounded corners (`ShapeDefaults.Medium` and `Large`) across all skeleton elements.
 
 ---
 
-### 4. Technical Architecture & Data Strategy
+## 3. Key Product Decisions & Trade-Offs
+
+- **Decision 1: Native Compose M3 Indicators vs. Lottie Animations**
+  - *Chosen Approach*: Replace all Lottie loaders (`LottieLoadingView`) with custom, reusable M3 components (`AstroM3LoadingIndicator`, `AstroLinearProgressBar`, and `AstroShimmerCard`).
+  - *Why*: Eliminates APK bloat, removes frame drops caused by JSON parsing on lower-end devices, adapts automatically to dynamic M3 color schemes and Dark Mode, and aligns with Google Material 3 guidelines.
+  - *Alternatives Considered*: Updating Lottie files with modern vectors (rejected due to persistent dependencies and lack of native Compose M3 theme reactivity).
+
+- **Decision 2: Splash Gate Navigation Synchronization**
+  - *Chosen Approach*: In `MainActivity.kt`, gate `RootNavHost` instantiation and splash overlay dismissal on a strict boolean condition: `sessionStatus !is SessionStatus.Initializing && (sessionStatus is SessionStatus.NotAuthenticated || isOnboarded != null)`. Keep the splash screen opaque until the start destination is statically immutable.
+  - *Why*: Prevents `NavHost` from temporarily defaulting to `Screen.OnboardingGraph` for 100–300ms while DataStore reads `isOnboarded` asynchronously.
+  - *Alternatives Considered*: Redirecting from inside `OnboardingScreen` (rejected as it causes the exact flash the user reported).
+
+---
+
+## 4. Technical Architecture & Component Flow
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        AstroXplore UI Layer                            │
-├────────────────────────────────────────────────────────────────────────┤
-│  PaperDetailsScreen                                                    │
-│  ├── AstroTopAppBar (Navigation, Bookmark, Share)                      │
-│  ├── PublicationHeroHeader (Title, ArXiv Tag, Authors Expander)        │
-│  ├── AstroTabRow (Overview | Metrics | BibTeX)                         │
-│  │   ├── TabOverview: Collapsible Abstract + Category Chips           │
-│  │   ├── TabMetrics: Citation Card, Bibcode, ADS Reference Link       │
-│  │   └── TabBibTeX: Syntax Formatted Card + 1-Tap Copy Action          │
-│  └── PersistentBottomDock (Read PDF / Download | Journal Club)         │
-└────────────────────────────────────────────────────────────────────────┘
-                                 │
-                                 ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                     Shared Reusable Component Suite                     │
-├────────────────────────────────────────────────────────────────────────┤
-│  • AstroTabRow.kt              - M3 animated pill/indicator tab row    │
-│  • CollapsibleSection.kt       - Expandable card with spring animation │
-│  • MetadataBadgeGroup.kt       - Uniform citation/arXiv/category chips │
-│  • AuthorChipsFlow.kt          - Expandable author list with avatars   │
-│  • PrimaryActionDock.kt        - Standardized bottom floating dock     │
-│  • BibTeXCodeBlock.kt          - Styled monospaced export card         │
-└────────────────────────────────────────────────────────────────────────┘
-                                 │
-                                 ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                    ViewModel & Repository Services                     │
-├────────────────────────────────────────────────────────────────────────┤
-│  PaperDetailsViewModel                                                 │
-│  ├── SavedPaperDao (Room DB, DownloadState Flow, Citation counts)      │
-│  ├── PdfDownloadManager (WorkManager / Streaming Cache)                │
-│  └── JournalGroupRepository (Journal clubs & group discussions)        │
-└────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│                      Cold Start                        │
+└──────────────────────────┬─────────────────────────────┘
+                           │
+             ┌─────────────▼─────────────┐
+             │ Session & Onboarding Gate │
+             │  (Holds M3 Splash State)  │
+             └─────────────┬─────────────┘
+                           │ Authenticated & Ready
+            ┌──────────────┴──────────────┐
+            ▼                             ▼
+ ┌──────────────────────┐      ┌──────────────────────┐
+ │  First-Time Visitor  │      │  Returning Scientist │
+ │ (Screen.Onboarding)  │      │   (Screen.MainGraph) │
+ └──────────────────────┘      └──────────┬───────────┘
+                                          │
+                  ┌───────────────────────┴───────────────────────┐
+                  ▼                                               ▼
+       ┌──────────────────────┐                       ┌──────────────────────┐
+       │   Screen Loading     │                       │ Background Sync/Push │
+       │  (Skeleton Shimmer & │                       │  (Top LinearProgress │
+       │  M3 Circular State)  │                       │    Indicator & Bar)  │
+       └──────────────────────┘                       └──────────────────────┘
 ```
 
-#### Data Model & State Mapping
-- `PaperDetailsUiState`: Sealed state hierarchy (`Loading`, `Success(paper, isSaved, downloadState)`, `Error(message)`).
-- `selectedTab`: Integer state (0 = Overview, 1 = Metrics, 2 = BibTeX) driving `AnimatedContent`.
-- `isAuthorsExpanded`: Boolean state governing whether to truncate to first 3 authors or display the complete collaboration list.
-- `downloadState`: Bound to `DownloadState` (`NOT_DOWNLOADED`, `DOWNLOADING(progress)`, `DOWNLOADED`, `FAILED`).
+### Component Structure & Modular Plan
 
-#### Step-by-Step Implementation Strategy
-1. **Create Shared Reusable Component Suite**:
-   - `core/ui/components/AstroTabRow.kt`: Clean M3 pill tab selector.
-   - `core/ui/components/CollapsibleSection.kt`: Header with arrow toggle and animated content reveal.
-   - `core/ui/components/AuthorChipsFlow.kt`: Elegant author monograms with expandable modal/drawer.
-   - `core/ui/components/BibTeXCodeBlock.kt`: Syntax-highlighted monospaced container with copy button.
-   - `core/ui/components/PrimaryActionDock.kt`: Reusable bottom dual-action bar.
-2. **Refactor & Modularize PaperDetailsScreen**:
-   - Split monolithic `PaperDetailsScreen.kt` into the main screen shell and focused sub-composables.
-   - Incorporate the tabbed layout, collapsible abstract, and rich metric cards.
-   - Wire the PDF download and reader routing cleanly with download state progress.
-3. **Verify App Build**:
-   - Compile and verify with `compile_applet`.
+1. **`core/ui/components/AstroLoadingIndicators.kt`** (New Unified File):
+   - `AstroM3LoadingIndicator`: Expressive Material 3 circular progress indicator with primary/secondary track styling, configurable sizes (`Small`, `Medium`, `Large`), and optional status label.
+   - `AstroLinearProgressBar`: Clean indeterminate linear progress indicator placed directly beneath app top bars during network queries.
+   - `AstroShimmerEffect`: Reusable `Modifier.astroShimmer()` using `rememberInfiniteTransition` to render smooth sweeps on card placeholders.
+   - `AstroPaperCardSkeleton`: Structural skeleton mockup mirroring `ExpandedLibraryListItem` and `PaperCard`.
+   - `AstroDetailsSkeleton`: Structural skeleton for paper metadata and abstract.
+
+2. **`MainActivity.kt`**:
+   - Refactor splash overlay and start destination gating logic to guarantee zero-flash transitions.
+   - Replace the Lottie book loader on the splash screen with a sleek, branded AstroXplore M3 loader.
+
+3. **Screen Modernization Across All Features**:
+   - `PaperDetailsScreen.kt`: Switch from `LottieLoadingView` to `AstroDetailsSkeleton`.
+   - `LibraryScreen.kt`: Switch from `LottieLoadingView` to `AstroPaperCardSkeleton` list and top linear sync progress.
+   - `ExploreScreen.kt`: Switch from `LottieLoadingView` to skeleton list.
+   - `GroupsScreen.kt` & `GroupDetailsScreen.kt`: Switch from `LottieLoadingView` to M3 indicators.
+   - `PdfViewerScreen.kt`: Switch to M3 determinate/indeterminate circular progress indicator with download percentage.
+   - `InterestsScreen.kt` & `EditProfileScreen.kt`: Switch to M3 loading indicators.
+   - Deprecate/clean up `LottieLoadingView.kt` and remove obsolete raw Lottie resources.

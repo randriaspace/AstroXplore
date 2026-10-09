@@ -1,6 +1,6 @@
 {
-  "summary":  "Comprehensive architectural and UX implementation plan for elevating AstroXplore to a world-class Google app standard, featuring an overhauled clean reader Paper Details screen with collapsible metadata sections, tabs, hero quick actions, and a shared reusable component library.",
-  "updatedAt":  "2026-10-09T09:03:30.503839147Z",
+  "summary":  "Implementation plan to modernize all loading screens and progress animations across AstroXplore to Material 3 standards, eliminate Lottie dependencies, introduce expressive skeleton shimmer loaders, and fix the startup onboarding flash.",
+  "updatedAt":  "2026-10-09T10:32:35.095910769Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

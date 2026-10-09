@@ -19,8 +19,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import com.example.astroxplore.R
-import com.example.astroxplore.core.ui.components.LottieLoadingView
+import com.example.astroxplore.core.ui.components.AstroLoadingSize
+import com.example.astroxplore.core.ui.components.AstroM3LoadingIndicator
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,10 +47,17 @@ fun EditProfileScreen(
     ) { innerPadding ->
         when (uiState) {
             is EditProfileUiState.Loading -> {
-                LottieLoadingView(
-                    size = 150,
-                    resId = R.raw.book_loader
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AstroM3LoadingIndicator(
+                        size = AstroLoadingSize.LARGE,
+                        label = "Loading profile..."
+                    )
+                }
             }
             is EditProfileUiState.Success -> {
                 val profile = (uiState as EditProfileUiState.Success).profile

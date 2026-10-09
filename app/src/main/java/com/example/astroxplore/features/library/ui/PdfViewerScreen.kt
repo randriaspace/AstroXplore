@@ -30,7 +30,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
-import com.example.astroxplore.core.ui.components.LottieLoadingView
+import com.example.astroxplore.core.ui.components.AstroLoadingSize
+import com.example.astroxplore.core.ui.components.AstroM3LoadingIndicator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -187,15 +188,10 @@ fun PdfViewerScreen(
         ) {
             when {
                 isLoading -> {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        LottieLoadingView(size = 180)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Rendering PDF pages...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
-                    }
+                    AstroM3LoadingIndicator(
+                        size = AstroLoadingSize.LARGE,
+                        label = "Rendering PDF pages..."
+                    )
                 }
                 renderError != null -> {
                     Column(
