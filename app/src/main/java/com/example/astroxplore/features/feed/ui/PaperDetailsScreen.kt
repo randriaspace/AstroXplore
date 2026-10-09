@@ -167,7 +167,7 @@ fun PaperDetailsScreen(
                             onReadPdfClick(paper.bibcode, localFile.absolutePath, paper.title)
                         } else if (hasPdfUrl) {
                             userInitiatedDownload = true
-                            viewModel.downloadAndOpenPdf(context, paper, onReadPdfClick)
+                            viewModel.downloadPaperPdf(context, paper)
                         } else {
                             // Direct user to external publisher / NASA ADS link
                             val url = "https://ui.adsabs.harvard.edu/abs/${paper.bibcode}"

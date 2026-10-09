@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.astroxplore.R
 import com.example.astroxplore.features.feed.model.PaperModel
+import com.example.astroxplore.core.ui.animation.expressiveBounce
 import com.example.astroxplore.core.ui.components.AstroM3DockedLinearProgress
 import com.example.astroxplore.core.ui.components.OfflineFallbackState
 import com.example.astroxplore.features.feed.ui.components.PaperCard
@@ -322,7 +323,10 @@ fun SearchBar(onSearchClick: () -> Unit, modifier: Modifier = Modifier) {
         onClick = onSearchClick,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = CircleShape,
-        modifier = modifier.fillMaxWidth().height(52.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .expressiveBounce(onClick = onSearchClick),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
     ) {
         Row(

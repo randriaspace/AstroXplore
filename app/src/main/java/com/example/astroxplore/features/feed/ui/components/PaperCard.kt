@@ -27,7 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.example.astroxplore.R
+import com.example.astroxplore.core.ui.animation.expressiveBounce
 import com.example.astroxplore.features.feed.model.PaperModel
+import com.example.astroxplore.ui.theme.ExpressiveCardShape
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,14 +55,15 @@ fun PaperCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp, horizontal = 16.dp),
+            .padding(vertical = 8.dp, horizontal = 16.dp)
+            .expressiveBounce(onClick = onTitleClick),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         ),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+        shape = ExpressiveCardShape,
         border = BorderStroke(
             width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
         )
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
@@ -75,14 +78,14 @@ fun PaperCard(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.85f),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.9f),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
                     ) {
                         Text(
                             text = paper.category.uppercase().ifBlank { "ASTRO" },
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold),
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -90,8 +93,8 @@ fun PaperCard(
 
                     if (!paper.arxivId.isNullOrBlank()) {
                         Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
                         ) {
                             Text(
                                 text = "arXiv:${paper.arxivId}",

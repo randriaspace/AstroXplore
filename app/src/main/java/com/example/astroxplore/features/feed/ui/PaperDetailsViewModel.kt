@@ -91,14 +91,20 @@ class PaperDetailsViewModel @Inject constructor(
         }
     }
 
+    fun downloadPaperPdf(context: Context, paper: PaperModel) {
+        libraryRepository.downloadPaperPdf(context, paper)
+    }
+
     fun downloadAndOpenPdf(
         context: Context,
         paper: PaperModel,
-        onOpenPdf: (bibcode: String, pdfFilePath: String, paperTitle: String) -> Unit
+        onOpenPdf: ((bibcode: String, pdfFilePath: String, paperTitle: String) -> Unit)? = null
     ) {
         libraryRepository.downloadPaperPdf(context, paper)
         val expectedFile = File(context.filesDir, "pdfs/${paper.bibcode}.pdf")
-        onOpenPdf(paper.bibcode, expectedFile.absolutePath, paper.title)
+        if (expectedFile.exists()) {
+            onOpenPdf?.invoke(paper.bibcode, expectedFile.absolutePath, paper.title)
+        }
     }
 
     fun addPaperToGroup(groupId: String, bibcode: String) {

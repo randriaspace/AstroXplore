@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.astroxplore.core.database.entity.DownloadState
+import com.example.astroxplore.core.ui.animation.expressiveBounce
 
 /**
  * Modern floating bottom action dock for primary document reading & group interactions.
@@ -38,15 +39,16 @@ fun PrimaryActionDock(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 2.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+        tonalElevation = 6.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 12.dp),
+                .padding(horizontal = 20.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -56,9 +58,10 @@ fun PrimaryActionDock(
                 enabled = !isDownloading,
                 modifier = Modifier
                     .weight(1.3f)
-                    .height(48.dp)
+                    .height(52.dp)
+                    .expressiveBounce()
                     .testTag("action_dock_read_pdf"),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -134,9 +137,10 @@ fun PrimaryActionDock(
                 onClick = onSecondaryActionClick,
                 modifier = Modifier
                     .weight(1.1f)
-                    .height(48.dp)
+                    .height(52.dp)
+                    .expressiveBounce()
                     .testTag("action_dock_secondary"),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(20.dp),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Row(

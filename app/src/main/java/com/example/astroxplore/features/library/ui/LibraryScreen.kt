@@ -29,10 +29,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.example.astroxplore.core.ui.animation.expressiveBounce
 import com.example.astroxplore.core.ui.components.AstroLinearProgressBar
 import com.example.astroxplore.core.ui.components.AstroM3DockedLinearProgress
 import com.example.astroxplore.core.ui.components.AstroPaperCardSkeleton
 import com.example.astroxplore.features.feed.model.PaperModel
+import com.example.astroxplore.ui.theme.ExpressiveCardShape
+import com.example.astroxplore.ui.theme.ExpressiveChipShape
 import kotlinx.coroutines.launch
 
 enum class LibraryFilter {
@@ -223,7 +226,7 @@ fun LibraryScreen(
                                 leadingIcon = {
                                     Icon(Icons.Outlined.Verified, contentDescription = null, modifier = Modifier.size(16.dp))
                                 },
-                                shape = RoundedCornerShape(10.dp),
+                                shape = ExpressiveChipShape,
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                     selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -239,7 +242,7 @@ fun LibraryScreen(
                                 leadingIcon = {
                                     Icon(Icons.Outlined.LockOpen, contentDescription = null, modifier = Modifier.size(16.dp))
                                 },
-                                shape = RoundedCornerShape(10.dp),
+                                shape = ExpressiveChipShape,
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
                                     selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
@@ -255,7 +258,7 @@ fun LibraryScreen(
                                 leadingIcon = {
                                     Icon(Icons.Outlined.Storage, contentDescription = null, modifier = Modifier.size(16.dp))
                                 },
-                                shape = RoundedCornerShape(10.dp),
+                                shape = ExpressiveChipShape,
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
                                     selectedLabelColor = MaterialTheme.colorScheme.onTertiaryContainer
@@ -536,7 +539,7 @@ fun ExpandedLibraryListItem(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(18.dp))
+                    .clip(ExpressiveCardShape)
                     .background(MaterialTheme.colorScheme.errorContainer)
                     .padding(horizontal = 20.dp),
                 contentAlignment = alignment
@@ -563,12 +566,14 @@ fun ExpandedLibraryListItem(
     ) {
         Card(
             onClick = onPaperClick,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .expressiveBounce(onClick = onPaperClick),
+            shape = ExpressiveCardShape,
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerLow
             ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f))
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
         ) {
             Column(
                 modifier = Modifier

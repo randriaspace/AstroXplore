@@ -1,116 +1,125 @@
-# PDF Reader & External Paper Flow Implementation Plan
+# Material 3 Expressive Design System Upgrade Implementation Plan
 
-Enhance the publication reading flow in AstroXplore to distinguish between downloadable PDFs and external publisher links, ensure the action button is disabled while downloading and auto-opens the PDF reader upon completion, and equip the PDF viewer with floating zoom controls, page scrubber, and native Android printing.
+Transform AstroXplore from baseline Material 3 to **Material 3 Expressive** based on the official [Building with M3 Expressive Guidelines](https://m3.material.io/blog/building-with-m3-expressive), delivering a confident, vibrant scientific research experience with the signature Twitter Blue chromatic palette, 24dp–32dp extra-rounded containers, spring-based bounce physics, and punchy editorial typography.
 
 ---
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following architectural decisions were confirmed based on your requirements:
-> - **External vs. Downloadable Flow**: If a paper does not have a downloadable PDF link, the primary action button adapts to **"Open Publisher Link"** with an external link icon (`OpenInNew`) to launch the publisher / ADS web portal.
-> - **Download Button Lock & Auto-Open**: While downloading, the "Read PDF" button is non-clickable (`enabled = false`) and displays the Material 3 progress indicator. As soon as the download finishes, the app **automatically opens the PDF reader**.
-> - **PDF Viewer Toolkit**: Equipped with floating zoom controls (`+`, `-`, reset to 100%), pinch-to-zoom, a page scrubber slider (`Page X of Y`), and a top-app-bar **Print** action using Android `PrintManager`.
+> Based on your selected preferences and the M3 Expressive guidelines:
+> - **Color Intensity**: Preserving the signature **Twitter Blue (`#1D9BF0`)** as the primary chromatic anchor, expanded into rich cosmic surface containers (`surfaceContainerLowest` through `surfaceContainerHighest`) with subtle celestial tints.
+> - **Container Geometry**: Upgrading all cards, dialogs, bottom sheets, and action docks to **24dp–32dp extra-rounded expressive shapes** (`Shapes.kt` system).
+> - **Interaction Physics**: Introducing **Spring-based physics with subtle organic bounce** (`Modifier.expressiveBounce()`) on cards, buttons, and floating docks using `Spring.DampingRatioMediumBouncy` and `Spring.StiffnessMediumLow`.
+> - **Expressive Typography**: Bold, editorial display headers with tighter tracking and high typographic contrast.
 
 ---
 
 ## 1. Overview & Core Concept
 
-- **What It Does**: Refines the primary action button in `PaperDetailsScreen` to provide appropriate affordances based on whether the paper has an open-access PDF (arXiv) or only an external publisher identifier (DOI / ADS). Eliminates tap confusion during background downloads by locking the button and auto-transitioning to the reader once downloaded. Enriches `PdfViewerScreen` with zoom, page navigation, and document printing.
-- **Target Audience / Persona**: Astrophysicists reading dense multi-page preprints who need to inspect figures with zoom, print research documents, and easily open paywalled or publisher articles.
+- **What It Does**: Upgrades AstroXplore's visual language, token system, component shapes, and motion engine to Google's latest **Material 3 Expressive** standard. Replaces generic boxy surfaces with sculpted, organic 24dp–32dp containers, responsive tactile spring physics, and high-chroma tonal contrasts.
+- **Target Audience / Persona**: Astrophysicists and researchers who want an engaging, modern reading tool that feels fluid, tactile, and distinct from traditional utilitarian research databases.
 - **Key Value**:
-  - Clear user expectations: users know immediately if a paper can be read offline or needs an external browser.
-  - Zero friction: no need to tap "Read Offline" again after waiting for a download to finish.
-  - Full reading utility: zoom in on charts/equations, jump through pages, and print directly from the device.
+  - Tactile delight through organic spring physics on touches and taps.
+  - Instantly recognizable visual hierarchy with expressive 24dp–32dp rounded containers.
+  - Deep chromatic contrast anchored around the signature Twitter Blue palette.
 
 ---
 
-## 2. User Experience & Visual Design
+## 2. Visual Tokens & Theming Upgrades
 
-### Key User Flows
+### A. Shapes (`Shapes.kt`)
+- **Extra Small**: `RoundedCornerShape(8.dp)` (Badges, tags)
+- **Small**: `RoundedCornerShape(12.dp)` (Filter chips, inputs)
+- **Medium**: `RoundedCornerShape(18.dp)` (Buttons, compact cards)
+- **Large**: `RoundedCornerShape(26.dp)` (Publication cards, dialogs)
+- **Extra Large**: `RoundedCornerShape(32.dp)` (Action docks, navigation sheets, bottom bars)
+- **Pill**: `CircleShape` (Floating controls, search bars, zoom docks)
 
-1. **Paper Details Action Flow**:
-   - **Case A: Downloadable PDF (Not Downloaded Yet)**:
-     - Button displays `[Download PDF / Read PDF]` in primary color.
-     - User taps button: triggers `downloadPaperWorker`.
-     - Button immediately disables (`enabled = false`), transitioning to M3 progress tracking: `"Connecting..."` -> `"Saving (X%)"`.
-     - Once complete, `LaunchedEffect` detects completion and **automatically opens the PDF Viewer**.
-   - **Case B: Downloadable PDF (Already Cached)**:
-     - Button displays `[Read Offline]` with a checkmark badge. Tapping opens the viewer immediately.
-   - **Case C: External Link Only (No PDF URL)**:
-     - Button adapts to `[Open Publisher Link]` with `Icons.AutoMirrored.Outlined.OpenInNew`.
-     - Tapping opens the DOI or NASA ADS link in the system browser or custom tab.
+### B. Color Palette (`Color.kt` & `Theme.kt`)
+- **Primary**: `TwitterBlue` (`#1D9BF0`) with high-chroma secondary (`#00A3FF`) and celestial cyan tertiary (`#38BDF8`).
+- **Dark Chromatic Surfaces**:
+  - `surface`: `Color(0xFF0B1118)` (Midnight Cosmic Slate)
+  - `surfaceContainerLowest`: `Color(0xFF060A0F)`
+  - `surfaceContainerLow`: `Color(0xFF0F1722)`
+  - `surfaceContainer`: `Color(0xFF131E2C)`
+  - `surfaceContainerHigh`: `Color(0xFF1A283A)`
+  - `surfaceContainerHighest`: `Color(0xFF22344A)`
+- **Light Chromatic Surfaces**:
+  - `surfaceContainerLowest`: `Color(0xFFFFFFFF)`
+  - `surfaceContainerLow`: `Color(0xFFF0F7FE)`
+  - `surfaceContainer`: `Color(0xFFE5F1FC)`
+  - `surfaceContainerHigh`: `Color(0xFFD8E9F9)`
+  - `surfaceContainerHighest`: `Color(0xFFCBE0F5)`
 
-2. **Enhanced PDF Viewer (`PdfViewerScreen`)**:
-   - **Top App Bar**:
-     - Document title and "Offline Storage" chip.
-     - **Print Action** (`Icons.Outlined.Print`): invokes Android `PrintManager` using standard `PrintDocumentAdapter`.
-     - **Share Action** (`Icons.Default.Share`): shares PDF file via `FileProvider`.
-   - **Reader Canvas**:
-     - Pinch-to-zoom gesture and double-tap reset.
-     - Page list renders smoothly with zoomed resolution.
-   - **Floating Zoom Controls**:
-     - Compact pill in bottom-right with Zoom Out (`-`), Current Zoom (`100%` / `150%`), and Zoom In (`+`).
-   - **Page Scrubber**:
-     - Bottom bar showing `Page 3 of 28` with a discrete slider for jumping across long papers.
+### C. Motion Engine (`ExpressiveMotion.kt`)
+- `Modifier.expressiveBounce()`: Responsive touch micro-interaction that subtly scales down to `0.97f` on press and springs back with `Spring.DampingRatioMediumBouncy` on release.
+- Smooth spring animations on tab switching, sheet transitions, and floating pill docks.
 
----
-
-## 3. Key Product Decisions & Trade-Offs
-
-- **Decision 1: Native Android `PrintManager` vs. Third-Party PDF Exporters**
-  - *Chosen Approach*: Implement a lightweight custom `PrintDocumentAdapter` passing the local cached PDF file directly to Android's system `PrintManager`.
-  - *Why*: Zero third-party dependencies, supports physical WiFi printers, Save-as-PDF, and Google Cloud Print with 100% standard OS compliance.
-  - *Alternatives Considered*: Opening an external PDF viewer app to print (rejected because it forces the user out of AstroXplore).
-
-- **Decision 2: Automatic Transition on Download Finish**
-  - *Chosen Approach*: Observe `downloadState` in `PaperDetailsScreen`. When `downloadState` transitions from `DOWNLOADING` to `DOWNLOADED` while the screen is active, trigger `onReadPdfClick` automatically.
-  - *Why*: Directly addresses user feedback that clicking during download is impossible and makes the download-to-read transition completely seamless.
+### D. Typography (`Type.kt`)
+- Prominent `FontWeight.ExtraBold` display titles with tighter tracking (`-0.5.sp`).
+- High-contrast hierarchy between bold headline metadata and legible monospace arXiv identifiers.
 
 ---
 
-## 4. Technical Architecture & Component Flow
+## 3. Component Transformations Across Screens
+
+1. **Feed & Cards (`PaperCard.kt`, `FeedScreen.kt`)**:
+   - Cards redesigned with **26dp smooth expressive corners**, subtle chromatic border stroke, and `expressiveBounce` tap feedback.
+   - Category chips and citation counts elevated into expressive pill badges.
+   - QuickFilterTabs upgraded to expressive segmented pill shapes with spring slide indicators.
+
+2. **Primary Action Dock & Reader (`PrimaryActionDock.kt`)**:
+   - Transformed into a **floating 32dp pill dock** with tonal elevation, spring-loaded buttons, and integrated M3 Expressive dual-mode progress indicator.
+
+3. **Personal Library (`LibraryScreen.kt`)**:
+   - `ExpandedLibraryListItem` transformed to 26dp expressive containers with swipe-to-dismiss background feedback.
+   - Docked linear progress indicator under the top app bar rendered with extra-rounded capsule ends.
+
+4. **PDF Viewer (`PdfViewerScreen.kt`)**:
+   - Floating zoom dock and page scrubber styled with expressive pill shapes (`CircleShape`) and spring-responsive action buttons.
+
+5. **Search & Explore (`ExploreScreen.kt`)**:
+   - Search bar styled as a 30dp expressive pill with dynamic icon morphing and spring-loaded suggestion chips.
+
+---
+
+## 4. Architecture & Technical Flow
 
 ```
-                     ┌───────────────────────────────┐
-                     │     Paper Details Screen      │
-                     └───────────────┬───────────────┘
-                                     │
-                    Has PDF URL? ────┴──── No PDF URL?
-                   /                                   \
-                  ▼                                     ▼
-        ┌───────────────────┐                 ┌───────────────────┐
-        │ [Read / Save PDF] │                 │ [Open Publisher]  │
-        └─────────┬─────────┘                 └─────────┬─────────┘
-                  │ Tapped                              │ Tapped
-                  ▼                                     ▼
-        ┌───────────────────┐                 ┌───────────────────┐
-        │ Button Disabled & │                 │ Open Browser / ADS│
-        │ M3 Progress Bar   │                 └───────────────────┘
-        └─────────┬─────────┘
-                  │ Download Complete
-                  ▼
-        ┌───────────────────┐
-        │ Auto-Open Reader  │
-        └─────────┬─────────┘
-                  ▼
-        ┌────────────────────────────────────────────────────────┐
-        │                   PdfViewerScreen                      │
-        │  [Print Icon]  [Share Icon]  [Pinch & Floating Zoom]   │
-        │                  [Page Scrubber]                       │
-        └────────────────────────────────────────────────────────┘
+                      ┌────────────────────────────┐
+                      │    AstroXploreTheme.kt     │
+                      └─────────────┬──────────────┘
+                                    │
+           ┌────────────────────────┼────────────────────────┐
+           ▼                        ▼                        ▼
+ ┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐
+ │ Expressive Shapes │    │ Expressive Colors │    │ Expressive Motion │
+ │ (24dp - 32dp)     │    │ (Twitter Blue)    │    │ (Spring Physics)  │
+ └─────────┬─────────┘    └─────────┬─────────┘    └─────────┬─────────┘
+           │                        │                        │
+           └────────────────────────┼────────────────────────┘
+                                    │
+       ┌────────────────────────────┴────────────────────────────┐
+       ▼                            ▼                            ▼
+┌──────────────┐             ┌──────────────┐             ┌──────────────┐
+│  Feed & Card │             │  Action Dock │             │  PDF Viewer  │
+│ Components   │             │ & Library    │             │  & Search    │
+└──────────────┘             └──────────────┘             └──────────────┘
 ```
 
 ### Planned File Edits
-1. **`core/ui/components/PrimaryActionDock.kt`**:
-   - Add support for `hasPdfUrl: Boolean`.
-   - When `!hasPdfUrl`: render "Open Publisher" with `Icons.AutoMirrored.Outlined.OpenInNew`.
-   - When `downloadState == DownloadState.DOWNLOADING`: disable button (`enabled = false`) and render M3 progress.
-2. **`features/feed/ui/PaperDetailsScreen.kt`**:
-   - Pass `hasPdfUrl = !paper.pdfUrl.isNullOrBlank()` to `PrimaryActionDock`.
-   - Add `LaunchedEffect(downloadState)` to automatically open `onReadPdfClick` when download completes.
-3. **`features/library/ui/PdfViewerScreen.kt`**:
-   - Add floating zoom controls (`+`, `-`, reset).
-   - Implement pinch-to-zoom using `graphicsLayer` scale and translation.
-   - Add page scrubber slider.
-   - Implement `printPdfDocument(context, file)` using Android `PrintManager`.
+1. **`app/src/main/java/com/example/astroxplore/ui/theme/Shapes.kt`**:
+   - Define M3 Expressive shapes (`ExpressiveShapes`) with 8dp, 12dp, 18dp, 26dp, and 32dp corner scales.
+2. **`app/src/main/java/com/example/astroxplore/ui/theme/Color.kt` & `Theme.kt`**:
+   - Update dark & light color schemes with expressive cosmic surface containers and Twitter Blue chroma. Wire `ExpressiveShapes` to `MaterialTheme`.
+3. **`app/src/main/java/com/example/astroxplore/ui/theme/Type.kt`**:
+   - Update typography scale with punchy expressive display and headline weights.
+4. **`app/src/main/java/com/example/astroxplore/core/ui/animation/ExpressiveMotion.kt`**:
+   - Implement `Modifier.expressiveBounce()` and spring physics utilities.
+5. **`app/src/main/java/com/example/astroxplore/features/feed/ui/components/PaperCard.kt`**:
+   - Update card styling to 26dp expressive containers with `expressiveBounce`.
+6. **`app/src/main/java/com/example/astroxplore/core/ui/components/PrimaryActionDock.kt`**:
+   - Upgrade action dock to 32dp floating container with expressive button springs.
+7. **`app/src/main/java/com/example/astroxplore/features/library/ui/LibraryScreen.kt` & `FeedScreen.kt`**:
+   - Polish filter chips and cards to expressive pill contours and spring transitions.

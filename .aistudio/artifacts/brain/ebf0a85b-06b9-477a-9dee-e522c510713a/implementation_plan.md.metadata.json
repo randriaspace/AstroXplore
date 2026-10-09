@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan to manage paper reading user flows (downloadable PDF vs. external publisher link), prevent double-taps during download with automatic reader launch upon completion, and enhance the PDF viewer with floating zoom controls, page scrubber, and native Android print support.",
-  "updatedAt":  "2026-10-09T12:55:38.322434718Z",
+  "summary":  "Implementation plan to upgrade AstroXplore to Material 3 Expressive (m3.material.io/blog/building-with-m3-expressive), featuring the Twitter Blue chromatic palette, 24dp-32dp extra-rounded expressive containers, spring-based micro-interaction physics with organic bounce, and bold editorial typography.",
+  "updatedAt":  "2026-10-09T13:32:39.045930708Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
