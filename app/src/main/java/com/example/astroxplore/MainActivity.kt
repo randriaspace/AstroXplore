@@ -64,9 +64,11 @@ class MainActivity : ComponentActivity() {
             val mainViewModel: MainViewModel = hiltViewModel()
             val sessionStatus by mainViewModel.sessionStatus.collectAsState()
 
-            // Keep splash screen visible until we have a determined session status
+            val isInitTimeout by mainViewModel.isInitTimeout.collectAsState()
+
+            // Keep splash screen visible until we have a determined session status, or 2s timeout elapses
             splashScreen.setKeepOnScreenCondition {
-                sessionStatus == SessionStatus.Initializing
+                sessionStatus == SessionStatus.Initializing && !isInitTimeout
             }
 
             val profileViewModel: ProfileViewModel = hiltViewModel()
@@ -84,12 +86,13 @@ class MainActivity : ComponentActivity() {
             ) {
                 val isOnboarded by mainViewModel.isOnboarded.collectAsState()
                 val navController = rememberNavController()
-                    AstroXploreMain(
-                        sessionStatus = sessionStatus,
-                        isOnboarded = isOnboarded,
-                        navController = navController,
-                        onScrollToTop = { mainViewModel.triggerScrollToTop() }
-                    )
+                AstroXploreMain(
+                    sessionStatus = sessionStatus,
+                    isOnboarded = isOnboarded,
+                    isInitTimeout = isInitTimeout,
+                    navController = navController,
+                    onScrollToTop = { mainViewModel.triggerScrollToTop() }
+                )
             }
         }
     }
@@ -100,21 +103,27 @@ class MainActivity : ComponentActivity() {
 fun AstroXploreMain(
     sessionStatus: SessionStatus = SessionStatus.Initializing,
     isOnboarded: Boolean? = null,
+    isInitTimeout: Boolean = false,
     navController: NavHostController = rememberNavController(),
     onScrollToTop: () -> Unit = {}
 ) {
     // Definitive readiness gate: wait until session is not Initializing,
-    // and if Authenticated, wait until onboarding is resolved (non-null).
-    val isReady = sessionStatus !is SessionStatus.Initializing &&
+    // or if 2-second timeout elapsed (offline launch), immediately unblock.
+    val isReady = isInitTimeout || (
+        sessionStatus !is SessionStatus.Initializing &&
         (sessionStatus is SessionStatus.NotAuthenticated || (sessionStatus is SessionStatus.Authenticated && isOnboarded != null))
+    )
 
-    val startDestination = remember(isReady, sessionStatus, isOnboarded) {
+    val startDestination = remember(isReady, sessionStatus, isOnboarded, isInitTimeout) {
         if (!isReady) null
         else when {
-            sessionStatus is SessionStatus.NotAuthenticated -> Screen.AuthGraph
+            // When offline/timeout or user is onboarded, allow direct access to MainGraph / Library
             sessionStatus is SessionStatus.Authenticated && isOnboarded == true -> Screen.MainGraph
             sessionStatus is SessionStatus.Authenticated && isOnboarded == false -> Screen.OnboardingGraph
-            else -> Screen.AuthGraph
+            isInitTimeout && isOnboarded == true -> Screen.MainGraph
+            isInitTimeout -> Screen.MainGraph
+            sessionStatus is SessionStatus.NotAuthenticated -> Screen.AuthGraph
+            else -> Screen.MainGraph
         }
     }
 

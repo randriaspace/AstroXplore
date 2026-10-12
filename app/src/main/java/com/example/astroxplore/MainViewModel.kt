@@ -39,12 +39,28 @@ class MainViewModel @Inject constructor(
             initialValue = true
         )
 
+    private val _isInitTimeout = MutableStateFlow(false)
+    val isInitTimeout: StateFlow<Boolean> = _isInitTimeout.asStateFlow()
+
     private val _isOnboarded = MutableStateFlow<Boolean?>(null)
     val isOnboarded: StateFlow<Boolean?> = _isOnboarded.asStateFlow()
 
     val scrollToTopEvent = navigationSignal.scrollToTop
 
     init {
+        // Enforce 2-second timeout for offline launch resilience.
+        // If Supabase session status stays Initializing after 2000ms, unlock the app.
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(2000L)
+            if (sessionStatus.value == SessionStatus.Initializing) {
+                _isInitTimeout.value = true
+                // If local onboarding was completed, set it, otherwise allow offline guest
+                val isLocalDataStoreOnboarded = settingsRepository.onboardingComplete.first()
+                if (isLocalDataStoreOnboarded) {
+                    _isOnboarded.value = true
+                }
+            }
+        }
         viewModelScope.launch {
             authRepository.sessionStatus.collect { status ->
                 if (status is SessionStatus.Authenticated) {

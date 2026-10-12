@@ -1,125 +1,78 @@
-# Material 3 Expressive Design System Upgrade Implementation Plan
+# Offline Launch Resilience & Immersive Cosmic Feed Loading Plan
 
-Transform AstroXplore from baseline Material 3 to **Material 3 Expressive** based on the official [Building with M3 Expressive Guidelines](https://m3.material.io/blog/building-with-m3-expressive), delivering a confident, vibrant scientific research experience with the signature Twitter Blue chromatic palette, 24dp–32dp extra-rounded containers, spring-based bounce physics, and punchy editorial typography.
+Resolve the first-launch offline screen blockage with a 2-second timeout and offline library fallback, and replace the generic feed skeletons with an expressive **Cosmic Orbital Constellation Loader** featuring pulsating celestial glow, dynamic star-field orbital rings, and astrophysics survey telemetry.
 
 ---
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> Based on your selected preferences and the M3 Expressive guidelines:
-> - **Color Intensity**: Preserving the signature **Twitter Blue (`#1D9BF0`)** as the primary chromatic anchor, expanded into rich cosmic surface containers (`surfaceContainerLowest` through `surfaceContainerHighest`) with subtle celestial tints.
-> - **Container Geometry**: Upgrading all cards, dialogs, bottom sheets, and action docks to **24dp–32dp extra-rounded expressive shapes** (`Shapes.kt` system).
-> - **Interaction Physics**: Introducing **Spring-based physics with subtle organic bounce** (`Modifier.expressiveBounce()`) on cards, buttons, and floating docks using `Spring.DampingRatioMediumBouncy` and `Spring.StiffnessMediumLow`.
-> - **Expressive Typography**: Bold, editorial display headers with tighter tracking and high typographic contrast.
+> Based on your selected preferences:
+> - **Offline Launch Blockage Resolution**: Implement a **2-second timeout gate** in `MainViewModel` and `MainActivity`. When launching completely offline or when Supabase session initialization takes longer than 2000ms, the app unblocks automatically, treats the user as an offline guest or loads cached credentials, and directs to the app feed/Saved Papers Library with a distinct offline indicator instead of freezing on the splash screen.
+> - **Immersive Feed Loading**: Upgrade the feed loading state from plain gray card skeletons to a **Cosmic Orbital Constellation Loader** with:
+>   - Concentric orbital rings with pulsating dashed strokes.
+>   - Interconnected celestial constellation nodes pulsing with harmonic alpha glows.
+>   - Deep cosmic radial glow gradient anchored by Twitter Blue (`#1D9BF0`) and Celestial Cyan (`#38BDF8`).
+>   - Animated telescope telemetry captions ("Scanning cosmological surveys...", "Aligning radio interferometer...", "Querying arXiv astrophysics preprints...").
+>   - Expressive 26dp cosmic card silhouettes with smooth celestial shimmer sweep.
 
 ---
 
-## 1. Overview & Core Concept
+## 1. Problem Analysis & Root Cause
 
-- **What It Does**: Upgrades AstroXplore's visual language, token system, component shapes, and motion engine to Google's latest **Material 3 Expressive** standard. Replaces generic boxy surfaces with sculpted, organic 24dp–32dp containers, responsive tactile spring physics, and high-chroma tonal contrasts.
-- **Target Audience / Persona**: Astrophysicists and researchers who want an engaging, modern reading tool that feels fluid, tactile, and distinct from traditional utilitarian research databases.
-- **Key Value**:
-  - Tactile delight through organic spring physics on touches and taps.
-  - Instantly recognizable visual hierarchy with expressive 24dp–32dp rounded containers.
-  - Deep chromatic contrast anchored around the signature Twitter Blue palette.
-
----
-
-## 2. Visual Tokens & Theming Upgrades
-
-### A. Shapes (`Shapes.kt`)
-- **Extra Small**: `RoundedCornerShape(8.dp)` (Badges, tags)
-- **Small**: `RoundedCornerShape(12.dp)` (Filter chips, inputs)
-- **Medium**: `RoundedCornerShape(18.dp)` (Buttons, compact cards)
-- **Large**: `RoundedCornerShape(26.dp)` (Publication cards, dialogs)
-- **Extra Large**: `RoundedCornerShape(32.dp)` (Action docks, navigation sheets, bottom bars)
-- **Pill**: `CircleShape` (Floating controls, search bars, zoom docks)
-
-### B. Color Palette (`Color.kt` & `Theme.kt`)
-- **Primary**: `TwitterBlue` (`#1D9BF0`) with high-chroma secondary (`#00A3FF`) and celestial cyan tertiary (`#38BDF8`).
-- **Dark Chromatic Surfaces**:
-  - `surface`: `Color(0xFF0B1118)` (Midnight Cosmic Slate)
-  - `surfaceContainerLowest`: `Color(0xFF060A0F)`
-  - `surfaceContainerLow`: `Color(0xFF0F1722)`
-  - `surfaceContainer`: `Color(0xFF131E2C)`
-  - `surfaceContainerHigh`: `Color(0xFF1A283A)`
-  - `surfaceContainerHighest`: `Color(0xFF22344A)`
-- **Light Chromatic Surfaces**:
-  - `surfaceContainerLowest`: `Color(0xFFFFFFFF)`
-  - `surfaceContainerLow`: `Color(0xFFF0F7FE)`
-  - `surfaceContainer`: `Color(0xFFE5F1FC)`
-  - `surfaceContainerHigh`: `Color(0xFFD8E9F9)`
-  - `surfaceContainerHighest`: `Color(0xFFCBE0F5)`
-
-### C. Motion Engine (`ExpressiveMotion.kt`)
-- `Modifier.expressiveBounce()`: Responsive touch micro-interaction that subtly scales down to `0.97f` on press and springs back with `Spring.DampingRatioMediumBouncy` on release.
-- Smooth spring animations on tab switching, sheet transitions, and floating pill docks.
-
-### D. Typography (`Type.kt`)
-- Prominent `FontWeight.ExtraBold` display titles with tighter tracking (`-0.5.sp`).
-- High-contrast hierarchy between bold headline metadata and legible monospace arXiv identifiers.
+### Why the app was blocked on the loading screen offline:
+1. `MainActivity.kt` used:
+   ```kotlin
+   splashScreen.setKeepOnScreenCondition { sessionStatus == SessionStatus.Initializing }
+   val isReady = sessionStatus !is SessionStatus.Initializing && ...
+   ```
+2. When launching without internet connectivity, Supabase Auth client's `sessionStatus` flow remains in `SessionStatus.Initializing` indefinitely while waiting for DNS resolution or server response.
+3. Because `sessionStatus` never transitions away from `Initializing`, `startDestination` remains `null`, the system splash screen stays locked, and the Compose splash overlay is never dismissed.
+4. **Fix**: Introduce a definitive 2-second timeout (`withTimeoutOrNull(2000L)`) combined with network awareness (`networkConnectivityObserver`). If offline or if Supabase session initialization does not complete within 2 seconds, resolve the session to an offline guest state, load local preferences, dismiss the splash, and open the app with full offline library access.
 
 ---
 
-## 3. Component Transformations Across Screens
+## 2. Proposed Changes & Architecture
 
-1. **Feed & Cards (`PaperCard.kt`, `FeedScreen.kt`)**:
-   - Cards redesigned with **26dp smooth expressive corners**, subtle chromatic border stroke, and `expressiveBounce` tap feedback.
-   - Category chips and citation counts elevated into expressive pill badges.
-   - QuickFilterTabs upgraded to expressive segmented pill shapes with spring slide indicators.
+### A. First-Launch Offline Timeout (`MainViewModel.kt` & `MainActivity.kt`)
+- In `MainViewModel`:
+  - Add `val isInitTimeout = MutableStateFlow(false)`.
+  - Launch a 2000ms timeout job on startup. If `sessionStatus` is still `Initializing` after 2000ms:
+    - Set `_isInitTimeout.value = true`.
+    - Check local Room profile / DataStore onboarding status. If locally onboarded or offline, resolve destination immediately to `Screen.MainGraph` (or `Screen.AuthGraph` if explicitly logged out).
+- In `MainActivity.kt`:
+  - Update `setKeepOnScreenCondition { sessionStatus == SessionStatus.Initializing && !isInitTimeout }`.
+  - Update `isReady` calculation so that reaching the 2-second timeout immediately produces a valid `startDestination`.
+  - Gracefully fade out the splash overlay into the main UI.
 
-2. **Primary Action Dock & Reader (`PrimaryActionDock.kt`)**:
-   - Transformed into a **floating 32dp pill dock** with tonal elevation, spring-loaded buttons, and integrated M3 Expressive dual-mode progress indicator.
+### B. Immersive Cosmic Orbital Constellation Loader (`CosmicConstellationLoader.kt`)
+- Create a dedicated component: `CosmicConstellationFeedLoader.kt`:
+  - **Custom Canvas Constellation**:
+    - Animated rotation angle using `rememberInfiniteTransition()`.
+    - Concentric orbital paths (semi-major/semi-minor ellipses) with soft celestial glow.
+    - Pulsating star nodes connected by constellation vector chords with animated dash phases.
+    - Pulsar core with radiant radial gradient expanding and contracting organically.
+  - **Rotating Astrophysics Telemetry**:
+    - Animated status text switching smoothly between survey states:
+      - *"Calibrating cosmological survey..."*
+      - *"Connecting to NASA ADS & arXiv mirrors..."*
+      - *"Mapping astronomical keywords & citations..."*
+  - **Expressive Shimmer Silhouettes**:
+    - Staggered 26dp expressive containers with cosmic slate surface colors (`#131E2C` / `#1A283A`) and subtle cyan border sweeps.
 
-3. **Personal Library (`LibraryScreen.kt`)**:
-   - `ExpandedLibraryListItem` transformed to 26dp expressive containers with swipe-to-dismiss background feedback.
-   - Docked linear progress indicator under the top app bar rendered with extra-rounded capsule ends.
-
-4. **PDF Viewer (`PdfViewerScreen.kt`)**:
-   - Floating zoom dock and page scrubber styled with expressive pill shapes (`CircleShape`) and spring-responsive action buttons.
-
-5. **Search & Explore (`ExploreScreen.kt`)**:
-   - Search bar styled as a 30dp expressive pill with dynamic icon morphing and spring-loaded suggestion chips.
+### C. Feed Screen Integration (`FeedScreen.kt`)
+- Replace the 5 standard gray `PaperCardSkeleton()` placeholders in `FeedScreen.kt` with `CosmicConstellationFeedLoader`.
+- Ensure pull-to-refresh and filter switching display the celestial loader with smooth enter/exit animations (`fadeIn` + `expandVertically`).
 
 ---
 
-## 4. Architecture & Technical Flow
+## 3. Verification Plan
 
-```
-                      ┌────────────────────────────┐
-                      │    AstroXploreTheme.kt     │
-                      └─────────────┬──────────────┘
-                                    │
-           ┌────────────────────────┼────────────────────────┐
-           ▼                        ▼                        ▼
- ┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐
- │ Expressive Shapes │    │ Expressive Colors │    │ Expressive Motion │
- │ (24dp - 32dp)     │    │ (Twitter Blue)    │    │ (Spring Physics)  │
- └─────────┬─────────┘    └─────────┬─────────┘    └─────────┬─────────┘
-           │                        │                        │
-           └────────────────────────┼────────────────────────┘
-                                    │
-       ┌────────────────────────────┴────────────────────────────┐
-       ▼                            ▼                            ▼
-┌──────────────┐             ┌──────────────┐             ┌──────────────┐
-│  Feed & Card │             │  Action Dock │             │  PDF Viewer  │
-│ Components   │             │ & Library    │             │  & Search    │
-└──────────────┘             └──────────────┘             └──────────────┘
-```
-
-### Planned File Edits
-1. **`app/src/main/java/com/example/astroxplore/ui/theme/Shapes.kt`**:
-   - Define M3 Expressive shapes (`ExpressiveShapes`) with 8dp, 12dp, 18dp, 26dp, and 32dp corner scales.
-2. **`app/src/main/java/com/example/astroxplore/ui/theme/Color.kt` & `Theme.kt`**:
-   - Update dark & light color schemes with expressive cosmic surface containers and Twitter Blue chroma. Wire `ExpressiveShapes` to `MaterialTheme`.
-3. **`app/src/main/java/com/example/astroxplore/ui/theme/Type.kt`**:
-   - Update typography scale with punchy expressive display and headline weights.
-4. **`app/src/main/java/com/example/astroxplore/core/ui/animation/ExpressiveMotion.kt`**:
-   - Implement `Modifier.expressiveBounce()` and spring physics utilities.
-5. **`app/src/main/java/com/example/astroxplore/features/feed/ui/components/PaperCard.kt`**:
-   - Update card styling to 26dp expressive containers with `expressiveBounce`.
-6. **`app/src/main/java/com/example/astroxplore/core/ui/components/PrimaryActionDock.kt`**:
-   - Upgrade action dock to 32dp floating container with expressive button springs.
-7. **`app/src/main/java/com/example/astroxplore/features/library/ui/LibraryScreen.kt` & `FeedScreen.kt`**:
-   - Polish filter chips and cards to expressive pill contours and spring transitions.
+1. **Compilation**: Run `compile_applet` to ensure zero compilation or type errors.
+2. **Unit Tests**: Run `gradle :app:testDebugUnitTest` to verify all existing Robolectric and unit tests pass.
+3. **Offline First-Launch Validation**:
+   - Verify that simulated offline connectivity or delayed auth response triggers the 2-second timeout fallback and releases the splash screen into the main app.
+   - Verify that the feed displays the offline banner and allows navigating to the Saved Papers Library.
+4. **Visual Polish**:
+   - Verify smooth 60fps canvas animations on the constellation loader.
+   - Verify dark and light theme colors on the cosmic loader.

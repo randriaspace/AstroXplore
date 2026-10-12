@@ -56,6 +56,7 @@ import com.example.astroxplore.features.feed.model.PaperModel
 import com.example.astroxplore.core.ui.animation.expressiveBounce
 import com.example.astroxplore.core.ui.components.AstroM3DockedLinearProgress
 import com.example.astroxplore.core.ui.components.OfflineFallbackState
+import com.example.astroxplore.features.feed.ui.components.CosmicConstellationFeedLoader
 import com.example.astroxplore.features.feed.ui.components.PaperCard
 import com.example.astroxplore.features.feed.ui.components.PaperCardSkeleton
 import com.example.astroxplore.features.groups.ui.components.GroupPickerSheet
@@ -187,7 +188,11 @@ fun FeedScreen(
                     if (!isOnline && papers.isEmpty()) {
                         item { OfflineFeedState(onLibraryClick = onLibraryClick) }
                     } else if (isRefreshing && papers.isEmpty()) {
-                        items(5) { PaperCardSkeleton() }
+                        item {
+                            CosmicConstellationFeedLoader(
+                                modifier = Modifier.fillParentMaxSize()
+                            )
+                        }
                     } else if (error != null && papers.isEmpty()) {
                         item {
                             Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
