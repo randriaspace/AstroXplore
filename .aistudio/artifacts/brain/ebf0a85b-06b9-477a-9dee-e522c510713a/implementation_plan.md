@@ -1,78 +1,57 @@
-# Offline Launch Resilience & Immersive Cosmic Feed Loading Plan
+# Academic Research Search & Gemini AI Research Briefing Plan
 
-Resolve the first-launch offline screen blockage with a 2-second timeout and offline library fallback, and replace the generic feed skeletons with an expressive **Cosmic Orbital Constellation Loader** featuring pulsating celestial glow, dynamic star-field orbital rings, and astrophysics survey telemetry.
-
----
-
-## User Review & Critical Decisions
-
-> [!IMPORTANT]
-> Based on your selected preferences:
-> - **Offline Launch Blockage Resolution**: Implement a **2-second timeout gate** in `MainViewModel` and `MainActivity`. When launching completely offline or when Supabase session initialization takes longer than 2000ms, the app unblocks automatically, treats the user as an offline guest or loads cached credentials, and directs to the app feed/Saved Papers Library with a distinct offline indicator instead of freezing on the splash screen.
-> - **Immersive Feed Loading**: Upgrade the feed loading state from plain gray card skeletons to a **Cosmic Orbital Constellation Loader** with:
->   - Concentric orbital rings with pulsating dashed strokes.
->   - Interconnected celestial constellation nodes pulsing with harmonic alpha glows.
->   - Deep cosmic radial glow gradient anchored by Twitter Blue (`#1D9BF0`) and Celestial Cyan (`#38BDF8`).
->   - Animated telescope telemetry captions ("Scanning cosmological surveys...", "Aligning radio interferometer...", "Querying arXiv astrophysics preprints...").
->   - Expressive 26dp cosmic card silhouettes with smooth celestial shimmer sweep.
+Enhance AstroXplore for astronomers and astrophysics researchers by removing the annoying loading bar under the feed filters, overhauling the Search/Explore screen into an academic-grade literature search console, and introducing Gemini AI-powered **Trending & Suggested Research Briefings** that synthesize user interests, active journal club discussions, and top astronomical citation patterns with one-tap NASA ADS filters.
 
 ---
 
-## 1. Problem Analysis & Root Cause
-
-### Why the app was blocked on the loading screen offline:
-1. `MainActivity.kt` used:
-   ```kotlin
-   splashScreen.setKeepOnScreenCondition { sessionStatus == SessionStatus.Initializing }
-   val isReady = sessionStatus !is SessionStatus.Initializing && ...
-   ```
-2. When launching without internet connectivity, Supabase Auth client's `sessionStatus` flow remains in `SessionStatus.Initializing` indefinitely while waiting for DNS resolution or server response.
-3. Because `sessionStatus` never transitions away from `Initializing`, `startDestination` remains `null`, the system splash screen stays locked, and the Compose splash overlay is never dismissed.
-4. **Fix**: Introduce a definitive 2-second timeout (`withTimeoutOrNull(2000L)`) combined with network awareness (`networkConnectivityObserver`). If offline or if Supabase session initialization does not complete within 2 seconds, resolve the session to an offline guest state, load local preferences, dismiss the splash, and open the app with full offline library access.
+## 1. Remove Annoying Loading Indicator Under Feed Filter Tabs
+- In `FeedScreen.kt`:
+  - Locate and remove `AstroM3DockedLinearProgress(visible = isRefreshing)` directly underneath `QuickFilterTabs(...)`.
+  - The feed screen already has the pull-to-refresh swipe indicator and the full-page cosmic constellation loader for empty queries; removing the docked line completely eliminates the visual clutter under the tabs.
 
 ---
 
-## 2. Proposed Changes & Architecture
+## 2. Elevate Explore/Search Screen for Professional Astronomers
+Astronomers and astrophysics researchers need high-signal literature discovery rather than casual browsing. We will augment the Explore experience with:
 
-### A. First-Launch Offline Timeout (`MainViewModel.kt` & `MainActivity.kt`)
-- In `MainViewModel`:
-  - Add `val isInitTimeout = MutableStateFlow(false)`.
-  - Launch a 2000ms timeout job on startup. If `sessionStatus` is still `Initializing` after 2000ms:
-    - Set `_isInitTimeout.value = true`.
-    - Check local Room profile / DataStore onboarding status. If locally onboarded or offline, resolve destination immediately to `Screen.MainGraph` (or `Screen.AuthGraph` if explicitly logged out).
-- In `MainActivity.kt`:
-  - Update `setKeepOnScreenCondition { sessionStatus == SessionStatus.Initializing && !isInitTimeout }`.
-  - Update `isReady` calculation so that reaching the 2-second timeout immediately produces a valid `startDestination`.
-  - Gracefully fade out the splash overlay into the main UI.
+### A. Academic Syntax & ADS Query Power Assist
+- Add quick-insert syntax chips in the search bar assistance bar:
+  - `bibcode:`, `author:^FirstAuthor`, `abs:"phrase"`, `year:2024-2026`, `property:refereed`, `database:astronomy`.
+- Provide instant regex detection and badge indicators when the researcher types standard astronomical identifiers (e.g. arXiv identifier `2403.12345`, ADS Bibcode `2024ApJ...900...12V`, or ORCID `0000-0002-1825-0097`).
 
-### B. Immersive Cosmic Orbital Constellation Loader (`CosmicConstellationLoader.kt`)
-- Create a dedicated component: `CosmicConstellationFeedLoader.kt`:
-  - **Custom Canvas Constellation**:
-    - Animated rotation angle using `rememberInfiniteTransition()`.
-    - Concentric orbital paths (semi-major/semi-minor ellipses) with soft celestial glow.
-    - Pulsating star nodes connected by constellation vector chords with animated dash phases.
-    - Pulsar core with radiant radial gradient expanding and contracting organically.
-  - **Rotating Astrophysics Telemetry**:
-    - Animated status text switching smoothly between survey states:
-      - *"Calibrating cosmological survey..."*
-      - *"Connecting to NASA ADS & arXiv mirrors..."*
-      - *"Mapping astronomical keywords & citations..."*
-  - **Expressive Shimmer Silhouettes**:
-    - Staggered 26dp expressive containers with cosmic slate surface colors (`#131E2C` / `#1A283A`) and subtle cyan border sweeps.
-
-### C. Feed Screen Integration (`FeedScreen.kt`)
-- Replace the 5 standard gray `PaperCardSkeleton()` placeholders in `FeedScreen.kt` with `CosmicConstellationFeedLoader`.
-- Ensure pull-to-refresh and filter switching display the celestial loader with smooth enter/exit animations (`fadeIn` + `expandVertically`).
+### B. High-Precision Academic Filters
+- Expand the fast filter carousel with:
+  - Top astronomical bibstems: `ApJ` (Astrophysical Journal), `MNRAS` (Monthly Notices of the RAS), `A&A` (Astronomy & Astrophysics), `AJ` (Astronomical Journal).
+  - Open Access (`property:openaccess`), Catalog Data (`property:data`), and Software Code (`property:software`).
 
 ---
 
-## 3. Verification Plan
+## 3. Gemini AI Research Briefing & Smart Synthesis
+Astronomers in research groups and journal clubs want personalized, scientifically grounded literature suggestions.
 
-1. **Compilation**: Run `compile_applet` to ensure zero compilation or type errors.
-2. **Unit Tests**: Run `gradle :app:testDebugUnitTest` to verify all existing Robolectric and unit tests pass.
-3. **Offline First-Launch Validation**:
-   - Verify that simulated offline connectivity or delayed auth response triggers the 2-second timeout fallback and releases the splash screen into the main app.
-   - Verify that the feed displays the offline banner and allows navigating to the Saved Papers Library.
-4. **Visual Polish**:
-   - Verify smooth 60fps canvas animations on the constellation loader.
-   - Verify dark and light theme colors on the cosmic loader.
+### A. AI Research Synthesis Engine (`AiResearchRecommender.kt`)
+- Call Gemini `gemini-3.5-flash` via clean REST service using Retrofit / Serialization.
+- Provide a resilient fallback synthesizer when offline or without an API key (using local Room keyword clusters and journal club presentation titles).
+- Synthesizes 4 rich contextual sources:
+  1. **User Research Interests & Keywords**: Cosmological parameters, exoplanet atmospheres, high-energy astrophysics, etc.
+  2. **Active Journal Club Topics**: Recent papers and discussion presentation titles from joined clubs.
+  3. **Saved Papers Library**: Highly cited papers saved locally by the user.
+  4. **High-Impact Citation Benchmarks**: Current landmark papers in ApJ, MNRAS, and Nature Astronomy.
+
+### B. Dedicated AI Research Briefing Cards (`AiResearchBriefingCard.kt`)
+On the Explore screen (idle state):
+- Replace static generic banners with an **"AI Research Briefing"** section:
+  - **"Why Recommended" badge** (e.g. *"Synthesized from your Journal Club 'JWST Exoplanet Club' & saved papers"*).
+  - **Academic Hypothesis / Overview**: A crisp 2-sentence rationale on why this specific research cluster is trending now.
+  - **Recommended Query Pill**: Formatted ADS query button (e.g., `(JWST OR "transmission spectroscopy") AND property:refereed AND year:2025-2026`).
+  - **One-Tap Explore Action**: Tapping immediately launches the exact ADS query with all appropriate filters pre-applied.
+
+---
+
+## 4. Verification & Testing Plan
+1. **Compilation Check**: Run `compile_applet` to verify all Kotlin files, serializers, and layouts build without warnings or errors.
+2. **Automated Unit Tests**: Run `gradle :app:testDebugUnitTest` to verify Room DAOs, ViewModels, and search query builder tests pass.
+3. **UI Verification**:
+   - Verify that pulling down to refresh the feed no longer renders the docked blue progress line under the filter chips.
+   - Verify the Explore screen renders the new Academic Search console and Gemini AI Research Briefing cards.
+   - Verify that tapping an AI research suggestion populates the query and executes the NASA ADS search.

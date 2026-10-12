@@ -40,6 +40,8 @@ import com.example.astroxplore.features.feed.ui.components.PaperDetailsBottomShe
 import com.example.astroxplore.features.feed.ui.components.PaperCardSkeleton
 import com.example.astroxplore.core.ui.components.AstroM3DockedLinearProgress
 import com.example.astroxplore.core.ui.components.OfflineFallbackState
+import com.example.astroxplore.features.search.ui.components.SpotifyStyleResearchHub
+import com.example.astroxplore.features.search.model.AiResearchBriefing
 
 private val QUICK_DISCOVERY_TOPICS = listOf(
     "JWST" to "James Webb Space Telescope",
@@ -66,6 +68,9 @@ fun ExploreScreen(
     val filter by viewModel.searchFilter.collectAsState()
     val savedPaperIds by viewModel.savedPaperIds.collectAsState()
     val suggestedKeywords by viewModel.suggestedKeywords.collectAsState()
+    val userResearchInterests by viewModel.userResearchInterests.collectAsState()
+    val aiBriefings by viewModel.aiBriefings.collectAsState()
+    val isAiLoading by viewModel.isAiLoading.collectAsState()
 
     var showFilterSheet by remember { mutableStateOf(false) }
     var selectedPaperForDetails by remember { mutableStateOf<PaperModel?>(null) }
@@ -269,6 +274,54 @@ fun ExploreScreen(
                     )
                 }
 
+                // Professional Journal Bibstem Chips
+                val majorJournals = listOf("ApJ", "MNRAS", "A&A", "AJ")
+                items(majorJournals) { bibstem ->
+                    val isSelected = filter.bibstem == bibstem
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = {
+                            viewModel.updateFilter(
+                                filter.copy(bibstem = if (isSelected) null else bibstem)
+                            )
+                        },
+                        label = { Text(bibstem) },
+                        leadingIcon = {
+                            Icon(Icons.AutoMirrored.Outlined.MenuBook, contentDescription = null, modifier = Modifier.size(14.dp))
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    )
+                }
+
+                // Quick Toggle: Catalog Data / Code
+                item {
+                    val hasDataOrSoftware = filter.hasData || filter.hasSoftware
+                    FilterChip(
+                        selected = hasDataOrSoftware,
+                        onClick = {
+                            viewModel.updateFilter(
+                                filter.copy(
+                                    hasData = !hasDataOrSoftware,
+                                    hasSoftware = !hasDataOrSoftware
+                                )
+                            )
+                        },
+                        label = { Text("Data & Code") },
+                        leadingIcon = {
+                            Icon(Icons.Outlined.DataObject, contentDescription = null, modifier = Modifier.size(15.dp))
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    )
+                }
+
                 // Curated Topic Chips
                 items(QUICK_DISCOVERY_TOPICS) { (chipLabel, searchQueryValue) ->
                     val isSelected = query.equals(searchQueryValue, ignoreCase = true)
@@ -319,8 +372,16 @@ fun ExploreScreen(
                         when (state) {
                             ExploreUiState.Idle -> SearchIdleState(
                                 suggestedKeywords = suggestedKeywords,
+                                userResearchInterests = userResearchInterests,
+                                aiBriefings = aiBriefings,
+                                isAiLoading = isAiLoading,
                                 onKeywordClick = { viewModel.onQueryChange(it) },
-                                onTopicClick = { viewModel.onQueryChange(it) }
+                                onTopicClick = { viewModel.onQueryChange(it) },
+                                onBriefingClick = { briefing ->
+                                    val safeQuery = briefing.suggestedKeywords.firstOrNull() ?: briefing.title
+                                    viewModel.onQueryChange(safeQuery)
+                                },
+                                onRefreshAi = { viewModel.loadAiResearchBriefings() }
                             )
 
                             ExploreUiState.Loading -> {
@@ -474,15 +535,17 @@ fun ExploreScreen(
     }
 }
 
-/**
- * Google Discover Style Idle Hub for Astrophysics Research
- */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SearchIdleState(
     suggestedKeywords: List<String>,
+    userResearchInterests: List<String>,
+    aiBriefings: List<AiResearchBriefing>,
+    isAiLoading: Boolean,
     onKeywordClick: (String) -> Unit,
-    onTopicClick: (String) -> Unit
+    onTopicClick: (String) -> Unit,
+    onBriefingClick: (AiResearchBriefing) -> Unit,
+    onRefreshAi: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -493,204 +556,16 @@ fun SearchIdleState(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Cosmic Hero Banner
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-            ),
-            border = BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-            )
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                                Color.Transparent
-                            )
-                        )
-                    )
-                    .padding(24.dp)
-            ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = CircleShape,
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Outlined.AutoAwesome,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
-
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                            shape = RoundedCornerShape(100.dp)
-                        ) {
-                            Text(
-                                text = "NASA ADS Engine",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "Explore the Universe",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Text(
-                        text = "Access over 10 million peer-reviewed papers, arXiv preprints, and astronomical catalogs with real-time academic precision.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 20.sp
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Curated Research Pathways
-        Text(
-            text = "CURATED RESEARCH PATHWAYS",
-            style = MaterialTheme.typography.labelLarge.copy(
-                letterSpacing = 1.sp,
-                fontWeight = FontWeight.Bold
-            ),
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Start
+        // Spotify Algorithm Discovery Hub
+        SpotifyStyleResearchHub(
+            briefings = aiBriefings,
+            userResearchInterests = userResearchInterests,
+            suggestedKeywords = suggestedKeywords,
+            isLoadingAi = isAiLoading,
+            onBriefingClick = onBriefingClick,
+            onKeywordClick = onKeywordClick,
+            onRefreshAi = onRefreshAi
         )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        val pathways = listOf(
-            Triple("Exoplanetary Atmospheres", "JWST transmission spectroscopy & biosignatures", "JWST exoplanet atmosphere"),
-            Triple("Cosmic Dawn & First Stars", "High-redshift galaxy formation at z > 10", "cosmic dawn high redshift galaxies"),
-            Triple("Supermassive Black Holes", "Relativistic jets and Event Horizon astrophysics", "supermassive black hole event horizon"),
-            Triple("Gravitational Wave Astronomy", "Multi-messenger neutron star & compact mergers", "gravitational wave neutron star merger")
-        )
-
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            pathways.forEach { (title, subtitle, searchVal) ->
-                Card(
-                    onClick = { onTopicClick(searchVal) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                    ),
-                    border = BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = title,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = subtitle,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        if (suggestedKeywords.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(28.dp))
-
-            Text(
-                text = "TRENDING RESEARCH TOPICS",
-                style = MaterialTheme.typography.labelLarge.copy(
-                    letterSpacing = 1.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Start
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                suggestedKeywords.forEach { keyword ->
-                    SuggestionChip(
-                        onClick = { onKeywordClick(keyword) },
-                        label = { Text(keyword) },
-                        icon = {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        colors = SuggestionChipDefaults.suggestionChipColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                            labelColor = MaterialTheme.colorScheme.onSurface
-                        ),
-                        border = SuggestionChipDefaults.suggestionChipBorder(
-                            borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                            enabled = true
-                        )
-                    )
-                }
-            }
-        }
 
         Spacer(modifier = Modifier.height(96.dp))
     }

@@ -163,8 +163,6 @@ fun FeedScreen(
                             selectedTab = selectedCategory,
                             onTabSelected = { viewModel.selectCategory(it) }
                         )
-
-                        AstroM3DockedLinearProgress(visible = isRefreshing)
                     }
                 }
             }

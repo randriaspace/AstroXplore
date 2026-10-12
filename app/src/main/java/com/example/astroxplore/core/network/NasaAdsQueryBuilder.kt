@@ -78,7 +78,12 @@ object NasaAdsQueryBuilder {
             return "author:\"$author\""
         }
 
-        // 4. Fallback: Title and Abstract
+        // 4. Raw Solr Query or Pre-constructed Clause: Contains operators or field syntax like title:, abs:, property:, AND, OR
+        if (input.contains(":") || input.contains(" AND ") || input.contains(" OR ") || input.startsWith("(") || input.contains("NOT ")) {
+            return input
+        }
+
+        // 5. Fallback: Title and Abstract for free-text search keywords
         return "(title:\"$input\" OR abs:\"$input\" OR author:\"$input\")"
     }
 
