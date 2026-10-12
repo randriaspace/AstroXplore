@@ -108,7 +108,14 @@ fun FeedScreen(
     var selectedPaperForGroup by remember { mutableStateOf<PaperModel?>(null) }
     
     val filterTabs = remember(userInterests) {
-        listOf("For You") + userInterests
+        listOf("For You", "Published", "Under Review") + userInterests
+    }
+
+    // Auto-redirect to Saved Papers Library when offline if feed is empty
+    LaunchedEffect(isOnline, papers.isEmpty()) {
+        if (!isOnline && papers.isEmpty()) {
+            onLibraryClick()
+        }
     }
 
     LaunchedEffect(Unit) {

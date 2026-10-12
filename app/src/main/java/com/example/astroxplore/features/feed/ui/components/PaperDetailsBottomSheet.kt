@@ -76,7 +76,7 @@ fun PaperDetailsBottomSheet(
                 ) {
                     Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("View Full Publication Details")
+                    Text("View Details")
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -153,7 +153,7 @@ fun PaperDetailsBottomSheet(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large
                 ) {
-                    Text("Go to Full Details Page")
+                    Text("Full Details")
                 }
             }
             

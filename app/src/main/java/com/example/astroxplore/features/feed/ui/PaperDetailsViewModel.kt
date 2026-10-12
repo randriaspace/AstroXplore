@@ -52,7 +52,15 @@ class PaperDetailsViewModel @Inject constructor(
 
     fun loadPaper(bibcode: String) {
         viewModelScope.launch {
-            _uiState.value = PaperDetailsUiState.Loading
+            // First check memory/local cache to instantly display details and prevent loss on app switching
+            val cachedPaper = paperRepository.getPaperByBibcode(bibcode)
+            if (cachedPaper != null) {
+                _uiState.value = PaperDetailsUiState.Success(cachedPaper)
+                observeSavedState(bibcode)
+            } else {
+                _uiState.value = PaperDetailsUiState.Loading
+            }
+
             try {
                 val papers = paperRepository.getPapersByQuery(
                     query = "bibcode:$bibcode",
@@ -62,11 +70,13 @@ class PaperDetailsViewModel @Inject constructor(
                 if (paper != null) {
                     _uiState.value = PaperDetailsUiState.Success(paper)
                     observeSavedState(bibcode)
-                } else {
+                } else if (_uiState.value !is PaperDetailsUiState.Success) {
                     _uiState.value = PaperDetailsUiState.Error("Paper not found")
                 }
             } catch (e: Exception) {
-                _uiState.value = PaperDetailsUiState.Error("Failed to load paper details")
+                if (_uiState.value !is PaperDetailsUiState.Success) {
+                    _uiState.value = PaperDetailsUiState.Error("Failed to load paper details")
+                }
             }
         }
     }

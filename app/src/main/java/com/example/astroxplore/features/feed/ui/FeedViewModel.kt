@@ -95,12 +95,16 @@ class FeedViewModel @Inject constructor(
         _pagedPapers,
         _selectedCategory
     ) { cached, paged, category ->
-        // If we have paged results, show them. 
-        // If on "For You" and no paged results yet, show cached.
-        if (category == "For You" && paged.isEmpty()) cached else paged
+        if (paged.isNotEmpty()) {
+            paged
+        } else if (category == "For You") {
+            cached
+        } else {
+            paged
+        }
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.WhileSubscribed(30000),
         initialValue = emptyList()
     )
 
@@ -128,17 +132,28 @@ class FeedViewModel @Inject constructor(
             isEndReached = false
             try {
                 val query = buildQuery(_selectedCategory.value)
-                println("AstroXplore: Refreshing category ${_selectedCategory.value} with query: $query")
                 val freshPapers = paperRepository.getPapersByQuery(query, page = 0)
-                println("AstroXplore: Found ${freshPapers.size} papers")
-                
                 _pagedPapers.value = freshPapers
                 
-                // Only cache "For You" top results for offline
-                if (_selectedCategory.value == "For You") {
+                // Cache papers for offline resilience & app-switch persistence
+                val currentCat = _selectedCategory.value
+                paperRepository.cacheCategoryPapers(currentCat, freshPapers)
+                if (currentCat == "For You") {
                     paperRepository.refreshFeed(query)
                 }
             } catch (e: Exception) {
+                // Keep existing in-memory papers or load cached fallback if empty
+                if (_pagedPapers.value.isEmpty()) {
+                    val currentCat = _selectedCategory.value
+                    val fallback = if (currentCat == "For You") {
+                        paperRepository.getCachedFeed().firstOrNull() ?: emptyList()
+                    } else {
+                        paperRepository.getCachedFeedByCategory(currentCat).firstOrNull() ?: emptyList()
+                    }
+                    if (fallback.isNotEmpty()) {
+                        _pagedPapers.value = fallback
+                    }
+                }
                 _error.value = ErrorMapper.mapToMessage(e)
             } finally {
                 _isRefreshing.value = false
@@ -159,7 +174,9 @@ class FeedViewModel @Inject constructor(
                 if (newPapers.isEmpty()) {
                     isEndReached = true
                 } else {
-                    _pagedPapers.value = _pagedPapers.value + newPapers
+                    val combined = _pagedPapers.value + newPapers
+                    _pagedPapers.value = combined
+                    paperRepository.cacheCategoryPapers(_selectedCategory.value, combined)
                 }
             } catch (e: Exception) {
                 currentPage-- // Reset page on error to allow retry
@@ -172,10 +189,20 @@ class FeedViewModel @Inject constructor(
     fun selectCategory(category: String) {
         if (_selectedCategory.value == category) return
         _selectedCategory.value = category
-        _pagedPapers.value = emptyList() // Clear current list to show skeletons
         currentPage = 0
         isEndReached = false
-        refresh()
+        viewModelScope.launch {
+            // First check if we have cached papers for this category so feed doesn't jump
+            val cached = if (category == "For You") {
+                paperRepository.getCachedFeed().firstOrNull() ?: emptyList()
+            } else {
+                paperRepository.getCachedFeedByCategory(category).firstOrNull() ?: emptyList()
+            }
+            if (cached.isNotEmpty()) {
+                _pagedPapers.value = cached
+            }
+            refresh()
+        }
     }
 
     fun toggleSavePaper(paper: PaperModel) {
@@ -196,6 +223,18 @@ class FeedViewModel @Inject constructor(
                 val userId = authRepository.currentUser?.id
                 val prefs = userId?.let { profileRepository.getUserPreferences(it) } ?: emptyList()
                 NasaAdsQueryBuilder.buildPreferenceQuery(prefs)
+            }
+            "Published" -> {
+                val userId = authRepository.currentUser?.id
+                val prefs = userId?.let { profileRepository.getUserPreferences(it) } ?: emptyList()
+                val base = if (prefs.isNotEmpty()) NasaAdsQueryBuilder.buildPreferenceQuery(prefs) else "database:astronomy"
+                "($base) AND property:refereed"
+            }
+            "Under Review" -> {
+                val userId = authRepository.currentUser?.id
+                val prefs = userId?.let { profileRepository.getUserPreferences(it) } ?: emptyList()
+                val base = if (prefs.isNotEmpty()) NasaAdsQueryBuilder.buildPreferenceQuery(prefs) else "database:astronomy"
+                "($base) AND (property:not_refereed OR doctype:eprint)"
             }
             else -> {
                 // High-fidelity broad search

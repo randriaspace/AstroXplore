@@ -801,7 +801,7 @@ fun EmptyLibraryState(
             ) {
                 Icon(Icons.Outlined.Explore, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Explore Universe")
+                Text("Explore")
             }
 
             OutlinedButton(
