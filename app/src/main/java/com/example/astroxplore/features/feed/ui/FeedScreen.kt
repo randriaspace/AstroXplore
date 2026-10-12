@@ -76,6 +76,7 @@ fun FeedScreen(
 ) {
     val papers by viewModel.feedPapers.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val isInitialLoading by viewModel.isInitialLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val savedPaperIds by viewModel.savedPaperIds.collectAsState()
     val isOnline by viewModel.isOnline.collectAsState()
@@ -187,7 +188,7 @@ fun FeedScreen(
 
                     if (!isOnline && papers.isEmpty()) {
                         item { OfflineFeedState(onLibraryClick = onLibraryClick) }
-                    } else if (isRefreshing && papers.isEmpty()) {
+                    } else if ((isRefreshing || isInitialLoading) && papers.isEmpty()) {
                         item {
                             CosmicConstellationFeedLoader(
                                 modifier = Modifier.fillParentMaxSize()
@@ -199,7 +200,7 @@ fun FeedScreen(
                                 Text(text = stringResource(error!!), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                             }
                         }
-                    } else if (!isRefreshing && papers.isEmpty()) {
+                    } else if (!isRefreshing && !isInitialLoading && papers.isEmpty()) {
                         item {
                             EmptyResultsState(category = selectedCategory)
                         }

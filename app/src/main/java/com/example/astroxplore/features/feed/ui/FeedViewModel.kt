@@ -35,6 +35,9 @@ class FeedViewModel @Inject constructor(
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing = _isRefreshing.asStateFlow()
 
+    private val _isInitialLoading = MutableStateFlow(true)
+    val isInitialLoading = _isInitialLoading.asStateFlow()
+
     private val _isLoadingMore = MutableStateFlow(false)
     val isLoadingMore = _isLoadingMore.asStateFlow()
 
@@ -157,6 +160,7 @@ class FeedViewModel @Inject constructor(
                 _error.value = ErrorMapper.mapToMessage(e)
             } finally {
                 _isRefreshing.value = false
+                _isInitialLoading.value = false
             }
         }
     }
