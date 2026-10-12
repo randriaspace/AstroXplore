@@ -1,9 +1,7 @@
 package com.example.astroxplore.features.search.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -12,7 +10,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -33,7 +30,7 @@ import com.example.astroxplore.features.search.model.AiResearchBriefing
  * Spotify-algorithm style discovery layout for research papers:
  * - "Made For You (Profile Research Keywords)" - Personalized keywords derived from the user's astrophysics profile & interests
  * - "Algorithmic Research Mixes" - Spotify mix cards with one-tap clean queries
- * - "Trending in Astrophysics" - High-impact topic pills
+ * - "Trending in Astrophysics" - High-impact topic pills with M3 Expressive star icons
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -51,7 +48,7 @@ fun SpotifyStyleResearchHub(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
-        // 1. "MADE FOR YOU" - User Profile Research Keywords (Spotify Daily Mix Pills)
+        // 1. "MADE FOR YOU" - User Profile Research Keywords
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -62,14 +59,14 @@ fun SpotifyStyleResearchHub(
                     Surface(
                         color = MaterialTheme.colorScheme.primaryContainer,
                         shape = CircleShape,
-                        modifier = Modifier.size(26.dp)
+                        modifier = Modifier.size(28.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.AutoAwesome,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(15.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
@@ -136,7 +133,7 @@ fun SpotifyStyleResearchHub(
             }
         }
 
-        // 2. "RESEARCH MIX CAROUSEL" - Deep Algorithmic Mixes from Journal Clubs
+        // 2. "RESEARCH MIX CAROUSEL"
         if (briefings.isNotEmpty()) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
@@ -182,7 +179,7 @@ fun SpotifyStyleResearchHub(
             }
         }
 
-        // 3. "TRENDING IN ASTROPHYSICS" - Spotify Genre Pill Cluster
+        // 3. "TRENDING IN ASTROPHYSICS"
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -240,8 +237,7 @@ fun SpotifyStyleResearchHub(
 }
 
 /**
- * Spotify Profile Keyword Pill:
- * Represents user profile research interest keywords with vibrant gradients and music-tag aesthetic
+ * M3 Expressive Profile Keyword Pill with Star Icon
  */
 @Composable
 fun SpotifyProfileKeywordPill(
@@ -252,14 +248,11 @@ fun SpotifyProfileKeywordPill(
     val cleanKeyword = if (keyword.startsWith("#")) keyword.substring(1) else keyword
 
     val palette = listOf(
-        Color(0xFF1D9BF0) to Color(0xFF0284C7), // Astro Sky
-        Color(0xFF8B5CF6) to Color(0xFF6D28D9), // Nebula Violet
-        Color(0xFF10B981) to Color(0xFF059669), // Emerald
-        Color(0xFFF59E0B) to Color(0xFFD97706), // Solar Gold
-        Color(0xFFEC4899) to Color(0xFFDB2777), // Stellar Pink
-        Color(0xFF06B6D4) to Color(0xFF0891B2)  // Cyan Pulse
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.secondary,
+        MaterialTheme.colorScheme.tertiary
     )
-    val (primaryColor, darkColor) = palette[index % palette.size]
+    val primaryColor = palette[index % palette.size]
 
     Surface(
         onClick = onClick,
@@ -272,17 +265,18 @@ fun SpotifyProfileKeywordPill(
             modifier = Modifier
                 .background(
                     Brush.horizontalGradient(
-                        listOf(primaryColor.copy(alpha = 0.22f), Color.Transparent)
+                        listOf(primaryColor.copy(alpha = 0.18f), Color.Transparent)
                     )
                 )
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                color = primaryColor,
-                shape = CircleShape,
-                modifier = Modifier.size(8.dp)
-            ) {}
+            Icon(
+                imageVector = Icons.Default.AutoAwesome,
+                contentDescription = null,
+                tint = primaryColor,
+                modifier = Modifier.size(16.dp)
+            )
 
             Spacer(modifier = Modifier.width(10.dp))
 
@@ -308,9 +302,7 @@ fun SpotifyProfileKeywordPill(
 }
 
 /**
- * Spotify Card Style for Research Topics:
- * Rich vibrant gradient, distinct color theme per card, cover-art inspired aesthetic,
- * showing the core research hypothesis and clean one-tap search action.
+ * Spotify Card Style for Research Topics
  */
 @Composable
 fun SpotifyResearchMixCard(
@@ -320,16 +312,16 @@ fun SpotifyResearchMixCard(
 ) {
     val (gradientColors, accentColor) = when {
         briefing.categoryBadge.contains("Club", ignoreCase = true) -> {
-            listOf(Color(0xFF1D9BF0).copy(alpha = 0.22f), MaterialTheme.colorScheme.surfaceContainerHigh) to Color(0xFF1D9BF0)
+            listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), MaterialTheme.colorScheme.surfaceContainerHigh) to MaterialTheme.colorScheme.primary
         }
         briefing.categoryBadge.contains("Citation", ignoreCase = true) -> {
-            listOf(Color(0xFF8B5CF6).copy(alpha = 0.22f), MaterialTheme.colorScheme.surfaceContainerHigh) to Color(0xFF8B5CF6)
+            listOf(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f), MaterialTheme.colorScheme.surfaceContainerHigh) to MaterialTheme.colorScheme.secondary
         }
         briefing.categoryBadge.contains("Exoplanet", ignoreCase = true) -> {
-            listOf(Color(0xFF10B981).copy(alpha = 0.22f), MaterialTheme.colorScheme.surfaceContainerHigh) to Color(0xFF10B981)
+            listOf(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f), MaterialTheme.colorScheme.surfaceContainerHigh) to MaterialTheme.colorScheme.tertiary
         }
         else -> {
-            listOf(Color(0xFFF59E0B).copy(alpha = 0.22f), MaterialTheme.colorScheme.surfaceContainerHigh) to Color(0xFFF59E0B)
+            listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f), MaterialTheme.colorScheme.surfaceContainerHigh) to MaterialTheme.colorScheme.primary
         }
     }
 
@@ -455,7 +447,7 @@ fun SpotifyResearchMixCard(
 }
 
 /**
- * Spotify Topic Pill
+ * M3 Expressive Topic Pill with Star/Sparkle Icon
  */
 @Composable
 fun SpotifyTopicPill(
@@ -466,12 +458,9 @@ fun SpotifyTopicPill(
     val cleanKeyword = if (keyword.startsWith("#")) keyword.substring(1) else keyword
 
     val accentColors = listOf(
-        Color(0xFF1D9BF0), // Astro Blue
-        Color(0xFF8B5CF6), // Cosmic Violet
-        Color(0xFF10B981), // Emerald
-        Color(0xFFF59E0B), // Solar Amber
-        Color(0xFFEC4899), // Nebula Magenta
-        Color(0xFF06B6D4)  // Cyan
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.secondary,
+        MaterialTheme.colorScheme.tertiary
     )
     val accent = accentColors[index % accentColors.size]
 
@@ -492,11 +481,11 @@ fun SpotifyTopicPill(
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(accent)
+            Icon(
+                imageVector = Icons.Outlined.AutoAwesome,
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(15.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
