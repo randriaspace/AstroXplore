@@ -1,16 +1,19 @@
 package com.example.astroxplore.features.groups.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,9 +33,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import android.content.ClipboardManager
-import android.content.ClipData
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -40,14 +40,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import com.example.astroxplore.R
 import com.example.astroxplore.core.ui.components.AstroLoadingSize
 import com.example.astroxplore.core.ui.components.AstroM3LoadingIndicator
 import com.example.astroxplore.core.util.QrCodeUtils
-import com.example.astroxplore.features.feed.model.PaperModel
-import com.example.astroxplore.features.feed.ui.components.PaperCard
 import com.example.astroxplore.features.groups.model.*
-import com.example.astroxplore.features.groups.ui.components.ConsensusVoting
+import com.example.astroxplore.features.groups.ui.components.*
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -70,9 +67,8 @@ fun GroupDetailsScreen(
     val isOnline by viewModel.isOnline.collectAsState()
     val currentUserId = viewModel.currentUserId
     val context = LocalContext.current
-    
+
     var selectedTabIndex by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Shelf", "Votes", "Sessions", "KPIs", "Admin")
 
     var showEditSheet by remember { mutableStateOf(false) }
     var showAddPaperSheet by remember { mutableStateOf(false) }
@@ -106,243 +102,147 @@ fun GroupDetailsScreen(
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
 
+    val papersList = (uiState as? GroupDetailsUiState.Success)?.groupPapers ?: emptyList()
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = { 
-                    Column {
-                        Text(
-                            group?.name ?: "Journal Club", 
-                            style = MaterialTheme.typography.titleMedium, 
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            group?.focusArea ?: "Active Astrophysics Discussion", 
-                            style = MaterialTheme.typography.labelSmall, 
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+            GroupHeroHeader(
+                group = group,
+                currentUserRole = currentUserRole,
+                currentUserId = currentUserId,
+                onNavigateBack = onNavigateBack,
+                onInviteClick = viewModel::createInvite,
+                onEditClick = { showEditSheet = true },
+                onSyncCalendarClick = {
+                    group?.let { g ->
+                        syncGroupToCalendar(context, g)
                     }
-                },
-                windowInsets = WindowInsets(0.dp),
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+            )
+        },
+        bottomBar = {
+            GroupQuickActionDock(
+                onNominateClick = { showAddPaperSheet = true },
+                onVoteAgendaClick = { selectedTabIndex = 1 },
+                onCalendarRsvpClick = {
+                    group?.let { g ->
+                        syncGroupToCalendar(context, g)
                     }
-                },
-                actions = {
-                    IconButton(onClick = viewModel::createInvite) {
-                        Icon(Icons.Default.QrCode, contentDescription = "Create club invite")
-                    }
-                    if (currentUserRole == "admin" || group?.ownerId == currentUserId || group?.ownerId?.startsWith("local_") == true) {
-                        IconButton(onClick = { showEditSheet = true }) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit Club")
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                }
             )
         }
     ) { innerPadding ->
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            // Meeting schedule sub-banner with Calendar Sync
-            if (group != null) {
-                val context = LocalContext.current
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .clickable {
-                                val intent = Intent(Intent.ACTION_INSERT).apply {
-                                    data = android.provider.CalendarContract.Events.CONTENT_URI
-                                    putExtra(android.provider.CalendarContract.Events.TITLE, "Journal Club: ${group!!.name}")
-                                    putExtra(android.provider.CalendarContract.Events.DESCRIPTION, "Upcoming Journal Club session.\nSchedule: ${group!!.meetingSchedule}")
-                                    putExtra(android.provider.CalendarContract.Events.EVENT_LOCATION, group!!.meetingLocation)
-                                    putExtra(android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, System.currentTimeMillis() + 86400000L)
-                                    putExtra(android.provider.CalendarContract.EXTRA_EVENT_END_TIME, System.currentTimeMillis() + 86400000L + 7200000L)
-                                }
-                                try {
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
-                                }
-                            }
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.CalendarToday,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = group!!.meetingSchedule,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = group!!.meetingLocation,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(12.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "Sync",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            // Expressive Segmented Pill Bar Navigation
+            GroupSegmentedNavBar(
+                selectedIndex = selectedTabIndex,
+                onTabSelected = { selectedTabIndex = it },
+                shelfCount = papersList.size,
+                votingCount = papersList.size,
+                sessionsCount = presentations.size,
+                adminPendingCount = if (currentUserRole == "admin") pendingRequests.size else 0
+            )
 
-            PrimaryScrollableTabRow(
-                selectedTabIndex = selectedTabIndex,
-                containerColor = Color.Transparent,
-                divider = {},
-                edgePadding = 16.dp
+            // Section content
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f)
             ) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTabIndex == index,
-                        onClick = { selectedTabIndex = index },
-                        text = { 
-                            Text(
-                                title, 
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Medium
-                            ) 
+                when (selectedTabIndex) {
+                    0 -> ShelfTab(
+                        uiState = uiState,
+                        onPaperClick = onPaperClick,
+                        onAddPaperClick = { showAddPaperSheet = true },
+                        onNominateClick = { bibcode, title ->
+                            selectedBibcodeForSchedule = bibcode
+                            selectedTitleForSchedule = title
+                            showScheduleSheet = true
                         }
                     )
-                }
-            }
-
-            when (selectedTabIndex) {
-                0 -> ShelfTab(
-                    uiState = uiState,
-                    onPaperClick = onPaperClick,
-                    onAddPaperClick = { showAddPaperSheet = true },
-                    onNominateClick = { bibcode, title ->
-                        selectedBibcodeForSchedule = bibcode
-                        selectedTitleForSchedule = title
-                        showScheduleSheet = true
-                    }
-                )
-                1 -> {
-                    when (val state = uiState) {
-                        is GroupDetailsUiState.Success -> {
-                            ConsensusVoting(
-                                papers = state.groupPapers,
-                                onVote = { viewModel.voteForPaper(it) },
-                                onUnvote = { viewModel.unvoteForPaper(it) },
-                                onPaperClick = onPaperClick,
-                                onNominateForTalk = { nominated ->
-                                    selectedBibcodeForSchedule = nominated.bibcode
-                                    selectedTitleForSchedule = nominated.title
-                                    showScheduleSheet = true
-                                }
-                            )
-                        }
-                        is GroupDetailsUiState.Loading -> {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                AstroM3LoadingIndicator(
-                                    size = AstroLoadingSize.LARGE,
-                                    label = "Loading discussions..."
+                    1 -> {
+                        when (val state = uiState) {
+                            is GroupDetailsUiState.Success -> {
+                                ConsensusVoting(
+                                    papers = state.groupPapers,
+                                    onVote = { viewModel.voteForPaper(it) },
+                                    onUnvote = { viewModel.unvoteForPaper(it) },
+                                    onPaperClick = onPaperClick,
+                                    onNominateForTalk = { nominated ->
+                                        selectedBibcodeForSchedule = nominated.bibcode
+                                        selectedTitleForSchedule = nominated.title
+                                        showScheduleSheet = true
+                                    },
+                                    onAddPaperClick = { showAddPaperSheet = true }
                                 )
                             }
-                        }
-                        is GroupDetailsUiState.Error -> {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(state.message, color = MaterialTheme.colorScheme.error)
+                            is GroupDetailsUiState.Loading -> {
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    AstroM3LoadingIndicator(
+                                        size = AstroLoadingSize.LARGE,
+                                        label = "Loading voting queue..."
+                                    )
+                                }
+                            }
+                            is GroupDetailsUiState.Error -> {
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text(state.message, color = MaterialTheme.colorScheme.error)
+                                }
                             }
                         }
                     }
-                }
-                2 -> {
-                    SessionsTab(
-                        presentations = presentations,
-                        reviews = sessionReviews,
-                        onScheduleClick = { 
-                            if (uiState is GroupDetailsUiState.Success) {
-                                val state = uiState as GroupDetailsUiState.Success
-                                val first = state.groupPapers.firstOrNull()
+                    2 -> {
+                        SessionsTab(
+                            presentations = presentations,
+                            reviews = sessionReviews,
+                            onScheduleClick = {
+                                val first = papersList.firstOrNull()
                                 selectedBibcodeForSchedule = first?.bibcode ?: "2024ApJ...001...01A"
                                 selectedTitleForSchedule = first?.title ?: "Astrophysics Preprint"
-                            } else {
-                                selectedBibcodeForSchedule = "2024ApJ...001...01A"
-                                selectedTitleForSchedule = "Astrophysics Preprint"
-                            }
-                            showScheduleSheet = true 
+                                showScheduleSheet = true
+                            },
+                            onAddReviewClick = { showReviewSheet = true },
+                            onCheckIn = { presentationId -> viewModel.checkInSession(presentationId) },
+                            onPaperClick = onPaperClick
+                        )
+                    }
+                    3 -> KpiTab(
+                        kpis = kpiStats,
+                        isOnline = isOnline,
+                        onRefresh = { viewModel.loadKpis(groupId) }
+                    )
+                    4 -> AdminTab(
+                        group = group,
+                        currentUserId = currentUserId,
+                        currentUserRole = currentUserRole,
+                        members = members,
+                        pendingRequests = pendingRequests,
+                        onApproveJoinRequest = { reqId, userId -> viewModel.approveJoinRequest(reqId, userId) },
+                        onDeclineJoinRequest = { reqId -> viewModel.declineJoinRequest(reqId) },
+                        onLeave = {
+                            viewModel.leaveGroup()
+                            onNavigateBack()
                         },
-                        onAddReviewClick = { showReviewSheet = true },
-                        onCheckIn = { presentationId -> viewModel.checkInSession(presentationId) },
-                        onPaperClick = onPaperClick
+                        onDelete = { showDeleteDialog = true },
+                        onKick = { targetUserId -> viewModel.kickMember(targetUserId) },
+                        onPromote = { targetUserId -> viewModel.updateMemberRole(targetUserId, "admin") },
+                        onDemote = { targetUserId -> viewModel.updateMemberRole(targetUserId, "member") },
+                        onEditClick = { showEditSheet = true },
+                        onShareInvite = {
+                            val sendIntent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(Intent.EXTRA_TEXT, "Join our ${group?.name ?: "Astrophysics"} Journal Club on AstroXplore with code: ${group?.displayId}")
+                                type = "text/plain"
+                            }
+                            context.startActivity(Intent.createChooser(sendIntent, null))
+                        }
                     )
                 }
-                3 -> KpiTab(
-                    kpis = kpiStats,
-                    isOnline = isOnline,
-                    onRefresh = { viewModel.loadKpis(groupId) }
-                )
-                4 -> AdminTab(
-                    group = group,
-                    currentUserId = currentUserId,
-                    currentUserRole = currentUserRole,
-                    members = members,
-                    pendingRequests = pendingRequests,
-                    onApproveJoinRequest = { reqId, userId -> viewModel.approveJoinRequest(reqId, userId) },
-                    onDeclineJoinRequest = { reqId -> viewModel.declineJoinRequest(reqId) },
-                    onLeave = { 
-                        viewModel.leaveGroup()
-                        onNavigateBack()
-                    },
-                    onDelete = { showDeleteDialog = true },
-                    onKick = { targetUserId -> viewModel.kickMember(targetUserId) },
-                    onPromote = { targetUserId -> viewModel.updateMemberRole(targetUserId, "admin") },
-                    onDemote = { targetUserId -> viewModel.updateMemberRole(targetUserId, "member") },
-                    onEditClick = { showEditSheet = true },
-                    onShareInvite = {
-                        val sendIntent: Intent = Intent().apply {
-                            action = Intent.ACTION_SEND
-                            putExtra(Intent.EXTRA_TEXT, "Join our ${group?.name ?: "Astrophysics"} Journal Club on AstroXplore with code: ${group?.displayId}")
-                            type = "text/plain"
-                        }
-                        val shareIntent = Intent.createChooser(sendIntent, null)
-                        context.startActivity(shareIntent)
-                    }
-                )
             }
         }
     }
@@ -370,7 +270,7 @@ fun GroupDetailsScreen(
         EditGroupSheet(
             group = group!!,
             onDismiss = { showEditSheet = false },
-            onUpdate = { n, d, f, s, l -> 
+            onUpdate = { n, d, f, s, l ->
                 viewModel.updateGroup(n, d, f, s, l)
                 showEditSheet = false
             }
@@ -390,9 +290,8 @@ fun GroupDetailsScreen(
     }
 
     if (showReviewSheet) {
-        val currentPapers = (uiState as? GroupDetailsUiState.Success)?.groupPapers ?: emptyList()
         AddSessionReviewSheet(
-            papers = currentPapers,
+            papers = papersList,
             onDismiss = { showReviewSheet = false },
             onSubmit = { bibcode, pTitle, notes, rating ->
                 viewModel.addSessionReview(bibcode, pTitle, notes, rating)
@@ -403,11 +302,11 @@ fun GroupDetailsScreen(
 
     if (showDeleteDialog) {
         AlertDialog(
-            onDismissRequest = { 
+            onDismissRequest = {
                 archivePassword = ""
-                showDeleteDialog = false 
+                showDeleteDialog = false
             },
-            title = { Text("Archive Journal Club?") },
+            title = { Text("Dissolve Journal Club?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("This archives the journal club and removes it from active member listings. Enter confirmation password.")
@@ -433,7 +332,7 @@ fun GroupDetailsScreen(
                     enabled = archivePassword.isNotBlank(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Archive Club")
+                    Text("Dissolve Club")
                 }
             },
             dismissButton = {
@@ -443,6 +342,25 @@ fun GroupDetailsScreen(
                 }) { Text("Cancel") }
             }
         )
+    }
+}
+
+private fun syncGroupToCalendar(context: Context, group: GroupModel) {
+    val intent = Intent(Intent.ACTION_INSERT).apply {
+        data = android.provider.CalendarContract.Events.CONTENT_URI
+        putExtra(android.provider.CalendarContract.Events.TITLE, "Journal Club: ${group.name}")
+        putExtra(
+            android.provider.CalendarContract.Events.DESCRIPTION,
+            "Journal Club session.\nSchedule: ${group.meetingSchedule}\nFocus Area: ${group.focusArea ?: "Astrophysics"}"
+        )
+        putExtra(android.provider.CalendarContract.Events.EVENT_LOCATION, group.meetingLocation)
+        putExtra(android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, System.currentTimeMillis() + 86400000L)
+        putExtra(android.provider.CalendarContract.EXTRA_EVENT_END_TIME, System.currentTimeMillis() + 86400000L + 7200000L)
+    }
+    try {
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
 }
 
@@ -459,15 +377,15 @@ fun ShelfTab(
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     AstroM3LoadingIndicator(
                         size = AstroLoadingSize.LARGE,
-                        label = "Loading papers..."
+                        label = "Loading curated shelf..."
                     )
                 }
             }
             is GroupDetailsUiState.Success -> {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 80.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     item {
                         Row(
@@ -482,19 +400,19 @@ fun ShelfTab(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    "Curated research preprints for this journal club",
+                                    "Preprints prioritized for presentation and peer debate",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             Button(
                                 onClick = onAddPaperClick,
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                shape = RoundedCornerShape(8.dp)
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                                shape = RoundedCornerShape(12.dp)
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Add Paper", fontSize = 12.sp)
+                                Text("Add Paper", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -531,9 +449,9 @@ fun ShelfPaperCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -542,27 +460,45 @@ fun ShelfPaperCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = paper.bibcode,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
                 Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                 ) {
                     Text(
-                        text = "${paper.voteCount} Votes",
+                        text = paper.bibcode,
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.ThumbUp,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "${paper.voteCount} Votes",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Text(
                 text = paper.title ?: "Preprint ${paper.bibcode}",
@@ -573,7 +509,7 @@ fun ShelfPaperCard(
             )
 
             if (!paper.authors.isNullOrBlank() || !paper.year.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = listOfNotNull(paper.authors, paper.year).joinToString(" • "),
                     style = MaterialTheme.typography.bodySmall,
@@ -581,27 +517,31 @@ fun ShelfPaperCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = onNominateClick) {
+                OutlinedButton(
+                    onClick = onNominateClick,
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                ) {
                     Icon(Icons.Outlined.Event, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Nominate for Talk", fontSize = 12.sp)
+                    Text("Schedule Talk", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+
                 Button(
                     onClick = onReadClick,
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp)
                 ) {
                     Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Read Abstract", fontSize = 12.sp)
+                    Text("Read Abstract", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -612,22 +552,32 @@ fun ShelfPaperCard(
 fun EmptyShelfCard(onAddClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
         )
     ) {
         Column(
-            modifier = Modifier.padding(24.dp).fillMaxWidth(),
+            modifier = Modifier
+                .padding(28.dp)
+                .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Icon(
-                Icons.AutoMirrored.Filled.MenuBook,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-            )
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                modifier = Modifier.size(64.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.MenuBook,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
             Text(
                 "No Papers on the Shelf Yet",
                 style = MaterialTheme.typography.titleMedium,
@@ -639,10 +589,13 @@ fun EmptyShelfCard(onAddClick: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
-            Button(onClick = onAddClick) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Add Paper to Shelf")
+            Button(
+                onClick = onAddClick,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Add Paper to Shelf", fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -659,9 +612,10 @@ fun SessionsTab(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Scheduled Sessions Header
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -669,13 +623,25 @@ fun SessionsTab(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
-                    Text("Scheduled Seminar Sessions", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("Upcoming presentations & virtual journal meetings", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "Presentation Timeline",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Upcoming seminars and discussion archives",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                Button(onClick = onScheduleClick, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), shape = RoundedCornerShape(8.dp)) {
+                Button(
+                    onClick = onScheduleClick,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
                     Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Schedule", fontSize = 12.sp)
+                    Text("Schedule Talk", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -684,16 +650,28 @@ fun SessionsTab(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
                 ) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier = Modifier.padding(24.dp).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        Icon(
+                            Icons.Default.EventAvailable,
+                            contentDescription = null,
+                            modifier = Modifier.size(36.dp),
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                        )
                         Text(
-                            "No talks scheduled yet. Schedule the next paper discussion!",
-                            style = MaterialTheme.typography.bodyMedium,
+                            "No Seminars Scheduled",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Schedule the next paper discussion to invite members and set up speaker slides.",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )
@@ -702,7 +680,7 @@ fun SessionsTab(
             }
         } else {
             items(presentations, key = { it.id ?: it.bibcode }) { presentation ->
-                ModernPresentationCard(
+                TimelinePresentationCard(
                     presentation = presentation,
                     onCheckIn = { onCheckIn(presentation.id ?: "") },
                     onPaperClick = { onPaperClick(presentation.bibcode) }
@@ -710,6 +688,7 @@ fun SessionsTab(
             }
         }
 
+        // Session Reviews Section
         item {
             Spacer(modifier = Modifier.height(8.dp))
             Row(
@@ -718,13 +697,25 @@ fun SessionsTab(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
-                    Text("Session Reviews & Takeaways", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("Meeting outcomes, ratings, and action points", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "Peer Review & Discussion Recaps",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Ratings, takeaways, and constructive commentary",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                OutlinedButton(onClick = onAddReviewClick, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), shape = RoundedCornerShape(8.dp)) {
+                FilledTonalButton(
+                    onClick = onAddReviewClick,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
                     Icon(Icons.Default.RateReview, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Add Notes", fontSize = 12.sp)
+                    Text("Add Notes", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -733,16 +724,22 @@ fun SessionsTab(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
                 ) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier = Modifier.padding(20.dp).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
-                            "No review notes recorded yet. Add summary conclusions after your session.",
-                            style = MaterialTheme.typography.bodyMedium,
+                            "No Peer Review Notes Yet",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "After discussing a preprint, record consensus conclusions, rating, and discussion notes.",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )
@@ -751,72 +748,14 @@ fun SessionsTab(
             }
         } else {
             items(reviews, key = { it.id ?: it.notes }) { review ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = review.bibcode,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Row {
-                                repeat(5) { starIndex ->
-                                    Icon(
-                                        imageVector = if (starIndex < review.rating) Icons.Default.Star else Icons.Outlined.Star,
-                                        contentDescription = null,
-                                        tint = if (starIndex < review.rating) Color(0xFFFFB300) else MaterialTheme.colorScheme.outlineVariant,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-                        }
-                        if (!review.paperTitle.isNullOrBlank()) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = review.paperTitle,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = review.notes,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "By ${review.reviewerName ?: "Club Member"}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = review.createdAt ?: "",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
+                ExpressiveReviewCard(review = review)
             }
         }
     }
 }
 
 @Composable
-fun ModernPresentationCard(
+fun TimelinePresentationCard(
     presentation: PresentationModel,
     onCheckIn: () -> Unit,
     onPaperClick: () -> Unit
@@ -831,25 +770,30 @@ fun ModernPresentationCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(18.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            Icons.Default.AccessTime,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = formattedDate,
                             style = MaterialTheme.typography.labelSmall,
@@ -860,18 +804,20 @@ fun ModernPresentationCard(
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
                 ) {
                     Text(
                         text = "${presentation.attendeeCount + if (checkedIn && !presentation.isCheckedIn) 1 else 0} Attending",
                         style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Text(
                 text = presentation.paperTitle ?: "Paper: ${presentation.bibcode}",
@@ -881,11 +827,11 @@ fun ModernPresentationCard(
                 overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(4.dp))
+                Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "Presenter: ${presentation.presenterName ?: "Club Member"}",
                     style = MaterialTheme.typography.bodySmall,
@@ -896,8 +842,8 @@ fun ModernPresentationCard(
             Spacer(modifier = Modifier.height(4.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(4.dp))
+                Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = presentation.meetingLocation ?: "Virtual Seminar Room",
                     style = MaterialTheme.typography.bodySmall,
@@ -912,10 +858,14 @@ fun ModernPresentationCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = onPaperClick) {
+                OutlinedButton(
+                    onClick = onPaperClick,
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
                     Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Read Preprint", fontSize = 12.sp)
+                    Text("Read Preprint", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
 
                 FilledTonalButton(
@@ -923,9 +873,9 @@ fun ModernPresentationCard(
                         checkedIn = !checkedIn
                         if (checkedIn) onCheckIn()
                     },
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = if (checkedIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                        containerColor = if (checkedIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp),
                         contentColor = if (checkedIn) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                     ),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
@@ -936,8 +886,81 @@ fun ModernPresentationCard(
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(if (checkedIn) "I'm Attending" else "RSVP / Check In", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (checkedIn) "RSVP Confirmed" else "RSVP / Check In",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun ExpressiveReviewCard(review: SessionReviewModel) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                ) {
+                    Text(
+                        text = review.bibcode,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    repeat(5) { starIndex ->
+                        Icon(
+                            imageVector = if (starIndex < review.rating) Icons.Default.Star else Icons.Outlined.Star,
+                            contentDescription = null,
+                            tint = if (starIndex < review.rating) Color(0xFFFFB300) else MaterialTheme.colorScheme.outlineVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+            if (!review.paperTitle.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = review.paperTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = review.notes,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "By ${review.reviewerName ?: "Club Member"}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = review.createdAt ?: "",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -952,7 +975,7 @@ fun KpiTab(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 80.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -970,22 +993,22 @@ fun KpiTab(
             }
         }
 
-        val metrics = kpis ?: GroupKpiModel(totalPapers = 3, totalVotes = 19, totalPresentations = 2, totalMembers = 4, totalReviews = 2)
+        val metrics = kpis ?: GroupKpiModel(totalPapers = 4, totalVotes = 22, totalPresentations = 3, totalMembers = 5, totalReviews = 3)
 
         // Highlight Metric Banner
         Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(18.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(52.dp)
+                    modifier = Modifier.size(54.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
@@ -998,7 +1021,7 @@ fun KpiTab(
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
-                    Text("Participation Score", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                    Text("Consensus Engagement Score", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                     Text("High member consensus and attendance engagement across recent preprint reviews.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
             }
@@ -1060,8 +1083,8 @@ fun KpiMetricCard(
 ) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
-        shape = RoundedCornerShape(16.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -1112,7 +1135,9 @@ fun AdminTab(
     val isAdmin = currentUserRole == "admin" || group?.ownerId == currentUserId || group?.ownerId?.startsWith("local_") == true
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
@@ -1122,7 +1147,7 @@ fun AdminTab(
         // Invite & Share Card
         item {
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -1136,7 +1161,7 @@ fun AdminTab(
                             Text("Club Invite Code", fontWeight = FontWeight.Bold)
                             Text("Share with colleagues to join this club", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        FilledTonalButton(onClick = onShareInvite, shape = RoundedCornerShape(8.dp)) {
+                        FilledTonalButton(onClick = onShareInvite, shape = RoundedCornerShape(10.dp)) {
                             Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Share")
@@ -1146,7 +1171,7 @@ fun AdminTab(
                     Spacer(modifier = Modifier.height(12.dp))
                     Surface(
                         color = MaterialTheme.colorScheme.background,
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -1165,7 +1190,7 @@ fun AdminTab(
                                 val clipboard = context.getSystemService(ClipboardManager::class.java)
                                 clipboard?.setPrimaryClip(ClipData.newPlainText("Club Code", group?.displayId ?: ""))
                             }) {
-                                Text("Copy Code", fontSize = 12.sp)
+                                Text("Copy Code", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -1191,8 +1216,8 @@ fun AdminTab(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f))
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
                 ) {
                     Row(
                         modifier = Modifier.padding(16.dp),
@@ -1243,11 +1268,11 @@ fun AdminTab(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                         contentColor = MaterialTheme.colorScheme.onErrorContainer
                     ),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Icon(Icons.Default.DeleteForever, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Dissolve Journal Club")
+                    Text("Dissolve Journal Club", fontWeight = FontWeight.Bold)
                 }
             } else {
                 Button(
@@ -1257,11 +1282,11 @@ fun AdminTab(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                         contentColor = MaterialTheme.colorScheme.onErrorContainer
                     ),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Leave Journal Club")
+                    Text("Leave Journal Club", fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -1276,11 +1301,11 @@ fun PendingRequestItem(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f))
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -1333,11 +1358,11 @@ fun MemberRosterItem(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -1405,7 +1430,7 @@ fun GroupInviteDialog(
                     Image(
                         bitmap = qrBitmap.asImageBitmap(),
                         contentDescription = "Club invitation QR code",
-                        modifier = Modifier.size(180.dp).clip(RoundedCornerShape(12.dp))
+                        modifier = Modifier.size(180.dp).clip(RoundedCornerShape(16.dp))
                     )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
@@ -1424,29 +1449,35 @@ fun GroupInviteDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = {
-                        val clipboard = context.getSystemService(ClipboardManager::class.java)
-                        clipboard?.setPrimaryClip(ClipData.newPlainText("Club Code", displayId))
-                    }) {
+                    OutlinedButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(ClipboardManager::class.java)
+                            clipboard?.setPrimaryClip(ClipData.newPlainText("Club Code", displayId))
+                        },
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
                         Text("Copy Code")
                     }
-                    Button(onClick = {
-                        val sendIntent = Intent().apply {
-                            action = Intent.ACTION_SEND
-                            putExtra(Intent.EXTRA_TEXT, "Join our $name Journal Club with code: $displayId")
-                            type = "text/plain"
-                        }
-                        context.startActivity(Intent.createChooser(sendIntent, null))
-                    }) {
+                    Button(
+                        onClick = {
+                            val sendIntent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(Intent.EXTRA_TEXT, "Join our $name Journal Club with code: $displayId")
+                                type = "text/plain"
+                            }
+                            context.startActivity(Intent.createChooser(sendIntent, null))
+                        },
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
                         Text("Share")
                     }
                 }
             }
         },
         confirmButton = {
-            Button(onClick = onDismiss) { Text("Done") }
+            Button(onClick = onDismiss, shape = RoundedCornerShape(10.dp)) { Text("Done") }
         }
     )
 }
@@ -1466,7 +1497,11 @@ fun EditGroupSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState()).navigationBarsPadding(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text("Edit Club Details", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
@@ -1475,11 +1510,11 @@ fun EditGroupSheet(
             OutlinedTextField(value = schedule, onValueChange = { schedule = it }, label = { Text("Meeting Schedule") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(value = location, onValueChange = { location = it }, label = { Text("Meeting Venue or Link") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
-            
+
             Button(
                 onClick = { onUpdate(name, description, focusArea, schedule, location) },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Text("Update Settings", fontWeight = FontWeight.Bold)
             }
@@ -1507,13 +1542,17 @@ fun AddPaperToShelfSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState()).navigationBarsPadding(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text("Add Paper to Shelf", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
             Text("Add an astrophysics preprint to the journal club reading queue.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-            Text("Quick Presets:", style = MaterialTheme.typography.labelSmall)
+            Text("Quick Presets:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
             presetPapers.forEach { (b, t, a) ->
                 SuggestionChip(
                     onClick = {
@@ -1565,7 +1604,7 @@ fun AddPaperToShelfSheet(
                 onClick = { onAdd(bibcode.trim(), title.trim(), authors.trim(), year.trim()) },
                 enabled = bibcode.isNotBlank() && title.isNotBlank(),
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Text("Add to Club Shelf", fontWeight = FontWeight.Bold)
             }
@@ -1584,17 +1623,29 @@ fun AddSessionReviewSheet(
     var selectedPaper by remember { mutableStateOf(papers.firstOrNull()) }
     var notes by remember { mutableStateOf("") }
     var rating by remember { mutableIntStateOf(5) }
+    var selectedTag by remember { mutableStateOf("Groundbreaking Methodology") }
+
+    val feedbackTags = listOf(
+        "Groundbreaking Methodology",
+        "Novel Spectral Analysis",
+        "Needs Citation Follow-up",
+        "Recommended for Thesis"
+    )
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState()).navigationBarsPadding(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text("Record Session Review", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
-            Text("Summarize key findings, consensus conclusions, and rating.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Summarize consensus conclusions, rating, and discussion takeaways.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             if (papers.isNotEmpty()) {
-                Text("Paper Discussed:", style = MaterialTheme.typography.labelMedium)
+                Text("Paper Discussed:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                 papers.take(4).forEach { paper ->
                     FilterChip(
                         selected = selectedPaper?.bibcode == paper.bibcode,
@@ -1604,7 +1655,7 @@ fun AddSessionReviewSheet(
                 }
             }
 
-            Text("Discussion Rating (1-5 Stars):", style = MaterialTheme.typography.labelMedium)
+            Text("Discussion Rating:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 (1..5).forEach { star ->
                     IconButton(onClick = { rating = star }) {
@@ -1618,6 +1669,20 @@ fun AddSessionReviewSheet(
                 }
             }
 
+            Text("Key Takeaway Tag:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                feedbackTags.take(2).forEach { tag ->
+                    FilterChip(
+                        selected = selectedTag == tag,
+                        onClick = { selectedTag = tag },
+                        label = { Text(tag, fontSize = 11.sp) }
+                    )
+                }
+            }
+
             OutlinedTextField(
                 value = notes,
                 onValueChange = { notes = it },
@@ -1628,14 +1693,15 @@ fun AddSessionReviewSheet(
             )
 
             Button(
-                onClick = { 
+                onClick = {
                     val bib = selectedPaper?.bibcode ?: "2024ApJ...001...01A"
                     val pTitle = selectedPaper?.title ?: "Seminar Paper"
-                    onSubmit(bib, pTitle, notes, rating) 
+                    val finalNotes = "[$selectedTag] $notes"
+                    onSubmit(bib, pTitle, finalNotes, rating)
                 },
                 enabled = notes.isNotBlank(),
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Text("Save Session Review", fontWeight = FontWeight.Bold)
             }
@@ -1659,7 +1725,11 @@ fun SchedulePresentationSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState()).navigationBarsPadding(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text("Schedule Seminar Talk", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
@@ -1693,7 +1763,7 @@ fun SchedulePresentationSheet(
                     onSchedule(selectedDateTime, location.trim())
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Text("Confirm Seminar Date", fontWeight = FontWeight.Bold)
             }
