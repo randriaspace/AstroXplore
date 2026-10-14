@@ -5,17 +5,17 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class GroupModel(
-    @SerialName("id") val id: String,
-    @SerialName("display_id") val displayId: String, // Short unique ID for searching/joining
-    @SerialName("name") val name: String,
+    @SerialName("id") val id: String = "",
+    @SerialName("display_id") val displayId: String = "", // Short unique ID for searching/joining
+    @SerialName("name") val name: String = "",
     @SerialName("description") val description: String? = null,
-    @SerialName("owner_id") val ownerId: String,
+    @SerialName("owner_id") val ownerId: String = "",
     @SerialName("focus_area") val focusArea: String? = null,
     @SerialName("member_count") val memberCount: Int = 1,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("visibility") val visibility: String = "private", // "public" or "private"
-    @kotlinx.serialization.Transient val meetingSchedule: String = "",
-    @kotlinx.serialization.Transient val meetingLocation: String = "",
+    @SerialName("meeting_schedule") val meetingSchedule: String = "",
+    @SerialName("meeting_location") val meetingLocation: String = "",
     @kotlinx.serialization.Transient val isMember: Boolean = false
 )
 
@@ -51,11 +51,11 @@ data class PresentationModel(
 @Serializable
 data class GroupMemberModel(
     @SerialName("id") val id: String? = null,
-    @SerialName("group_id") val groupId: String,
-    @SerialName("user_id") val userId: String,
+    @SerialName("group_id") val groupId: String = "",
+    @SerialName("user_id") val userId: String = "",
     @SerialName("role") val role: String = "member", // admin, moderator, member
     @SerialName("joined_at") val joinedAt: String? = null,
-    val userName: String? = "Fellow Researcher"
+    @kotlinx.serialization.Transient val userName: String? = "Fellow Researcher"
 )
 
 @Serializable

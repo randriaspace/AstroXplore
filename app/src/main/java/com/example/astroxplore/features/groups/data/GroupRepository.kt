@@ -126,14 +126,25 @@ class GroupRepository @Inject constructor(
                 emptyList()
             }
 
+            val existingLocal = groupDao.getAllGroups().firstOrNull()?.associateBy { it.id } ?: emptyMap()
+
             if (remoteGroups.isNotEmpty()) {
                 val entities = remoteGroups.map { group ->
-                    val isMember = memberGroupIds.contains(group.id) || group.ownerId == userId
-                    group.toEntity(isSynced = true).copy(isMember = isMember)
+                    val isMember = memberGroupIds.contains(group.id) ||
+                            group.ownerId.equals(userId, ignoreCase = true) ||
+                            existingLocal[group.id]?.isMember == true ||
+                            group.isMember
+                    val schedule = group.meetingSchedule.ifBlank { existingLocal[group.id]?.meetingSchedule.orEmpty() }
+                    val location = group.meetingLocation.ifBlank { existingLocal[group.id]?.meetingLocation.orEmpty() }
+                    group.toEntity(isSynced = true).copy(
+                        isMember = isMember,
+                        meetingSchedule = schedule,
+                        meetingLocation = location
+                    )
                 }
                 groupDao.insertGroups(entities)
 
-                remoteGroups.filter { memberGroupIds.contains(it.id) || it.ownerId == userId }.forEach { group ->
+                remoteGroups.filter { memberGroupIds.contains(it.id) || it.ownerId.equals(userId, ignoreCase = true) }.forEach { group ->
                     try {
                         syncGroupPapers(group.id)
                         syncGroupMembers(group.id)
@@ -425,6 +436,7 @@ class GroupRepository @Inject constructor(
             focusArea = focusArea?.trim(),
             memberCount = 1,
             createdAt = createdAt,
+            visibility = "private",
             meetingSchedule = schedule,
             meetingLocation = location,
             isMember = true
@@ -446,51 +458,61 @@ class GroupRepository @Inject constructor(
 
         // 2. Try remote Supabase in background
         try {
-            val rows = supabaseClient.postgrest.rpc(
-                function = "create_group",
-                parameters = buildJsonObject {
-                    put("p_name", name.trim())
-                    put("p_description", description?.let(::JsonPrimitive) ?: JsonNull)
-                    put("p_focus_area", focusArea?.let(::JsonPrimitive) ?: JsonNull)
-                    put("p_visibility", "public")
-                }
-            ).decodeList<GroupModel>()
-            val remote = rows.singleOrNull()
-            if (remote != null) {
+            val groupPayload = mapOf(
+                "name" to name.trim(),
+                "display_id" to displayId,
+                "description" to (description ?: ""),
+                "focus_area" to (focusArea ?: ""),
+                "owner_id" to currentUserId,
+                "visibility" to "private",
+                "status" to "active",
+                "is_public" to false,
+                "member_count" to 1,
+                "meeting_schedule" to schedule,
+                "meeting_location" to location
+            )
+            val inserted = supabaseClient.postgrest["groups"]
+                .insert(groupPayload) { select() }
+                .decodeSingleOrNull<GroupModel>()
+            if (inserted != null) {
+                try {
+                    supabaseClient.postgrest["group_members"].insert(
+                        mapOf("group_id" to inserted.id, "user_id" to currentUserId, "role" to "admin")
+                    )
+                } catch (_: Exception) {}
                 groupDao.deleteGroup(localId)
-                groupDao.insertGroup(remote.toEntity(isSynced = true).copy(isMember = true, meetingSchedule = schedule, meetingLocation = location))
-                return@withContext remote.copy(meetingSchedule = schedule, meetingLocation = location, isMember = true)
+                groupDao.insertGroup(inserted.toEntity(isSynced = true).copy(
+                    isMember = true,
+                    meetingSchedule = schedule,
+                    meetingLocation = location
+                ))
+                groupMemberDao.insertMember(
+                    ownerMember.copy(groupId = inserted.id).toEntity(isSynced = true)
+                )
+                return@withContext inserted.copy(meetingSchedule = schedule, meetingLocation = location, isMember = true)
             }
         } catch (_: Exception) {
-            // Direct table fallback if RPC is missing on remote Supabase instance
+            // Fall back to RPC if direct table insert fails
             try {
-                val groupPayload = mapOf(
-                    "name" to name.trim(),
-                    "display_id" to displayId,
-                    "description" to (description ?: ""),
-                    "focus_area" to (focusArea ?: ""),
-                    "owner_id" to currentUserId,
-                    "visibility" to "public",
-                    "status" to "active",
-                    "is_public" to true,
-                    "member_count" to 1
-                )
-                val inserted = supabaseClient.postgrest["groups"]
-                    .insert(groupPayload) { select() }
-                    .decodeSingleOrNull<GroupModel>()
-                if (inserted != null) {
+                val rows = supabaseClient.postgrest.rpc(
+                    function = "create_group",
+                    parameters = buildJsonObject {
+                        put("p_name", name.trim())
+                        put("p_description", description?.let(::JsonPrimitive) ?: JsonNull)
+                        put("p_focus_area", focusArea?.let(::JsonPrimitive) ?: JsonNull)
+                        put("p_visibility", "private")
+                    }
+                ).decodeList<GroupModel>()
+                val remote = rows.singleOrNull()
+                if (remote != null) {
                     try {
-                        supabaseClient.postgrest["group_members"].insert(
-                            mapOf("group_id" to inserted.id, "user_id" to currentUserId, "role" to "admin")
-                        )
+                        supabaseClient.postgrest["groups"].update(
+                            mapOf("meeting_schedule" to schedule, "meeting_location" to location)
+                        ) { filter { eq("id", remote.id) } }
                     } catch (_: Exception) {}
                     groupDao.deleteGroup(localId)
-                    groupDao.insertGroup(inserted.toEntity(isSynced = true).copy(
-                        isMember = true,
-                        meetingSchedule = schedule,
-                        meetingLocation = location
-                    ))
-                    return@withContext inserted.copy(meetingSchedule = schedule, meetingLocation = location, isMember = true)
+                    groupDao.insertGroup(remote.toEntity(isSynced = true).copy(isMember = true, meetingSchedule = schedule, meetingLocation = location))
+                    return@withContext remote.copy(meetingSchedule = schedule, meetingLocation = location, isMember = true)
                 }
             } catch (_: Exception) {
                 // Safely retained in Room DB with isSynced = false for subsequent queue drain
@@ -502,8 +524,9 @@ class GroupRepository @Inject constructor(
 
     suspend fun joinGroup(inviteOrDisplayId: String): Boolean = withContext(Dispatchers.IO) {
         val normalized = normalizeJoinInput(inviteOrDisplayId)
+        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: "local_user"
 
-        // 1. Check local clubs first (matches displayId e.g. "JWST01", "EXOATM02", or ID)
+        // 1. Check local clubs first (matches displayId e.g. "ASTRO123", "JWST01", or ID)
         val allLocal = groupDao.getAllGroups().firstOrNull() ?: emptyList()
         val localMatch = allLocal.find { 
             normalizeJoinInput(it.displayId) == normalized || 
@@ -512,37 +535,73 @@ class GroupRepository @Inject constructor(
         }
 
         if (localMatch != null) {
-                // Check if club is public - auto join, otherwise submit request
-                if (localMatch.visibility == "public") {
-                    return@withContext joinPublicClub(localMatch.id)
-                } else {
-                    return@withContext submitJoinRequest(localMatch.id)
-                }
-            }
+            groupDao.updateMembership(localMatch.id, true)
+            val member = GroupMemberModel(
+                id = UUID.randomUUID().toString(),
+                groupId = localMatch.id,
+                userId = currentUserId,
+                userName = "You",
+                role = "member",
+                joinedAt = LocalDateTime.now().toString()
+            )
+            groupMemberDao.insertMember(member.toEntity(isSynced = true))
 
-            // 2. Lookup remote group by display_id
             try {
-                val found = supabaseClient.postgrest["groups"]
-                    .select(columns = Columns.ALL) {
-                        filter {
-                            eq("display_id", normalized)
-                            eq("status", "active")
-                        }
-                    }
-                    .decodeSingle<GroupModel>()
-
-                // Check visibility and act accordingly
-                if (found.visibility == "public") {
-                    return@withContext joinPublicClub(found.id)
-                } else {
-                    return@withContext submitJoinRequest(found.id)
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                false
-            }
+                supabaseClient.postgrest["group_members"].insert(
+                    mapOf("group_id" to localMatch.id, "user_id" to currentUserId, "role" to "member")
+                )
+            } catch (_: Exception) {}
+            return@withContext true
         }
+
+        // 2. Lookup remote group by display_id or id
+        try {
+            val remoteGroups = supabaseClient.postgrest["groups"]
+                .select(columns = Columns.ALL)
+                .decodeList<GroupModel>()
+
+            val found = remoteGroups.find {
+                normalizeJoinInput(it.displayId) == normalized ||
+                normalizeJoinInput(it.id) == normalized ||
+                it.name.contains(inviteOrDisplayId.trim(), ignoreCase = true)
+            }
+
+            if (found != null) {
+                // Save membership to Supabase
+                try {
+                    supabaseClient.postgrest["group_members"].insert(
+                        mapOf("group_id" to found.id, "user_id" to currentUserId, "role" to "member")
+                    )
+                } catch (_: Exception) {}
+
+                // Save to local Room DB
+                groupDao.insertGroup(found.toEntity(isSynced = true).copy(isMember = true))
+                val member = GroupMemberModel(
+                    id = UUID.randomUUID().toString(),
+                    groupId = found.id,
+                    userId = currentUserId,
+                    userName = "You",
+                    role = "member",
+                    joinedAt = LocalDateTime.now().toString()
+                )
+                groupMemberDao.insertMember(member.toEntity(isSynced = true))
+
+                try {
+                    syncGroupPapers(found.id)
+                    syncGroupMembers(found.id)
+                    syncGroupPresentations(found.id)
+                } catch (_: Exception) {}
+
+                return@withContext true
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Keep local fallback
+        }
+
+        false
+    }
 
     suspend fun joinPublicClub(groupId: String): Boolean = withContext(Dispatchers.IO) {
         val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: "local_user"

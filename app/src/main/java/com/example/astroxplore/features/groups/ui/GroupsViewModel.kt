@@ -33,24 +33,16 @@ class GroupsViewModel @Inject constructor(
     private val _messages = MutableSharedFlow<String>()
     val messages = _messages.asSharedFlow()
 
-    // Offline-First: Reactively observe joined clubs from Room
-    val myGroups: StateFlow<List<GroupModel>> = groupRepository.getMyGroups()
+    // Offline-First: Reactively observe joined private clubs from Room
+    val myClubs: StateFlow<List<GroupModel>> = groupRepository.getMyGroups()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
 
-    // Reactively observe discoverable public clubs from Room
-    val exploreGroups: StateFlow<List<GroupModel>> = groupRepository.getExploreGroups()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
-    val uiState: StateFlow<GroupsUiState> = combine(myGroups, exploreGroups) { my, explore ->
-        GroupsUiState.Success(myClubs = my, exploreClubs = explore)
+    val uiState: StateFlow<GroupsUiState> = myClubs.map<List<GroupModel>, GroupsUiState> { clubs ->
+        GroupsUiState.Success(clubs = clubs)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -110,18 +102,10 @@ class GroupsViewModel @Inject constructor(
             val success = groupRepository.joinGroup(displayId)
             _joinStatus.emit(success)
             if (success) {
-                _messages.emit("Join request sent to club admin for approval!")
+                _messages.emit("Joined club successfully! Welcome aboard.")
+                syncGroups()
             } else {
-                _messages.emit("Couldn't find club with this code. Please check the QR code.")
-            }
-        }
-    }
-
-    fun joinPublicClub(groupId: String, clubName: String) {
-        viewModelScope.launch {
-            val success = groupRepository.joinPublicClub(groupId)
-            if (success) {
-                _messages.emit("Joined \"$clubName\"! Check My Clubs.")
+                _messages.emit("Couldn't find club with this code. Please check the code or QR scanner.")
             }
         }
     }
@@ -129,9 +113,6 @@ class GroupsViewModel @Inject constructor(
 
 sealed interface GroupsUiState {
     data object Loading : GroupsUiState
-    data class Success(
-        val myClubs: List<GroupModel>,
-        val exploreClubs: List<GroupModel>
-    ) : GroupsUiState
+    data class Success(val clubs: List<GroupModel>) : GroupsUiState
     data class Error(val message: String) : GroupsUiState
 }

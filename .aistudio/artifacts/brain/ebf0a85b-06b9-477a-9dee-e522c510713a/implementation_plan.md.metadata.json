@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for fixing profile auto-provisioning and JobCancellationException in AstroXplore",
-  "updatedAt": "2026-10-14T06:57:52.876636270Z",
+  "summary": "Implementation plan for removing public journal clubs and adding multi-day, multi-time, frequency scheduling to group creation",
+  "updatedAt": "2026-10-14T09:06:14.579431702Z",
   "requestFeedback": true,
   "userFacing": true
 }
