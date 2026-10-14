@@ -664,11 +664,16 @@ fun CreateClubSheet(
 ) {
     var currentStep by remember { mutableIntStateOf(0) }
 
-    // Step 0: Identity & Theme State
+    // Step 0: Immersive Identity & Theme State
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var selectedTheme by remember { mutableStateOf(AstroClubThemes.options[0]) }
     var focusArea by remember { mutableStateOf("") }
+    var selectedIconName by remember { mutableStateOf("Rocket") }
+    var selectedColorTriple by remember { mutableStateOf(AstroClubThemes.availableColors[0]) }
+
+    val currentAccentColor = selectedColorTriple.second
+    val currentContainerColor = currentAccentColor.copy(alpha = 0.14f)
+    val currentIcon = AstroClubThemes.availableIcons[selectedIconName] ?: Icons.Default.RocketLaunch
 
     val quickTopics = listOf("Exoplanets", "JWST Galaxies", "Gravitational Waves", "Black Holes", "Cosmology", "Fast Radio Bursts")
 
@@ -768,14 +773,14 @@ fun CreateClubSheet(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
                         shape = CircleShape,
-                        color = selectedTheme.containerColor,
-                        modifier = Modifier.size(36.dp)
+                        color = currentContainerColor,
+                        modifier = Modifier.size(38.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                selectedTheme.icon,
+                                currentIcon,
                                 contentDescription = null,
-                                tint = selectedTheme.primaryColor,
+                                tint = currentAccentColor,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -784,7 +789,7 @@ fun CreateClubSheet(
                     Column {
                         Text(
                             text = when (currentStep) {
-                                0 -> "Step 1 of 3: Identity & Theme"
+                                0 -> "Step 1 of 3: Immersive Identity"
                                 1 -> "Step 2 of 3: Meeting Cadence"
                                 else -> "Step 3 of 3: Venue & Review"
                             },
@@ -793,8 +798,8 @@ fun CreateClubSheet(
                         )
                         Text(
                             text = when (currentStep) {
-                                0 -> "Name, research focus, and visual theme"
-                                1 -> "Meeting recurrence and consensus schedule"
+                                0 -> "Personalized icon, accent color, and focus"
+                                1 -> "Meeting recurrence and schedule logic"
                                 else -> "Venue link and final confirmation"
                             },
                             style = MaterialTheme.typography.bodySmall,
@@ -811,7 +816,7 @@ fun CreateClubSheet(
                     .fillMaxWidth()
                     .height(5.dp)
                     .clip(RoundedCornerShape(3.dp)),
-                color = selectedTheme.primaryColor,
+                color = currentAccentColor,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
 
@@ -833,7 +838,7 @@ fun CreateClubSheet(
             ) { step ->
                 when (step) {
                     // -------------------------------------------------------------
-                    // STEP 0: Identity & Theme
+                    // STEP 0: Immersive Identity & Personalized Icon & Color
                     // -------------------------------------------------------------
                     0 -> {
                         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -843,65 +848,94 @@ fun CreateClubSheet(
                                 label = { Text("Journal Club Name *") },
                                 placeholder = { Text("e.g. JWST High-Redshift Syndicate") },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Edit, contentDescription = null, tint = selectedTheme.primaryColor)
+                                    Icon(currentIcon, contentDescription = null, tint = currentAccentColor)
                                 },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
 
-                            // Curated Theme & Icon Selection
+                            // Immersive Accent Color Palette
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(
-                                    "Visual Theme & Icon:",
+                                    "Material 3 Immersive Accent Color:",
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold
                                 )
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    items(AstroClubThemes.options) { themeOption ->
-                                        val isSelected = selectedTheme.id == themeOption.id
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    AstroClubThemes.availableColors.forEach { colorTriple ->
+                                        val isSelected = selectedColorTriple.first == colorTriple.first
                                         Surface(
-                                            onClick = { selectedTheme = themeOption },
-                                            shape = RoundedCornerShape(14.dp),
-                                            color = if (isSelected) themeOption.containerColor else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
-                                            border = BorderStroke(
-                                                width = if (isSelected) 2.dp else 1.dp,
-                                                color = if (isSelected) themeOption.primaryColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                                            ),
-                                            modifier = Modifier.width(130.dp)
+                                            onClick = { selectedColorTriple = colorTriple },
+                                            shape = CircleShape,
+                                            color = colorTriple.second,
+                                            border = if (isSelected) BorderStroke(2.5.dp, MaterialTheme.colorScheme.onSurface) else null,
+                                            modifier = Modifier.size(32.dp)
                                         ) {
-                                            Column(
-                                                modifier = Modifier.padding(10.dp),
-                                                horizontalAlignment = Alignment.CenterHorizontally
+                                            if (isSelected) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(
+                                                        Icons.Default.Check,
+                                                        contentDescription = null,
+                                                        tint = Color.White,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Personalized Modern Icon Selection from M Icons
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    "Personalized Club Icon (Material Icons):",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        val iconEntries = AstroClubThemes.availableIcons.entries.toList()
+                                        iconEntries.chunked(4).forEach { rowItems ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
-                                                Surface(
-                                                    shape = CircleShape,
-                                                    color = themeOption.containerColor,
-                                                    modifier = Modifier.size(36.dp)
-                                                ) {
-                                                    Box(contentAlignment = Alignment.Center) {
-                                                        Icon(
-                                                            themeOption.icon,
-                                                            contentDescription = themeOption.iconName,
-                                                            tint = themeOption.primaryColor,
-                                                            modifier = Modifier.size(20.dp)
-                                                        )
+                                                rowItems.forEach { (iconName, iconVector) ->
+                                                    val isSelected = selectedIconName == iconName
+                                                    Surface(
+                                                        onClick = { selectedIconName = iconName },
+                                                        shape = RoundedCornerShape(12.dp),
+                                                        color = if (isSelected) currentContainerColor else MaterialTheme.colorScheme.surface,
+                                                        border = BorderStroke(
+                                                            width = if (isSelected) 1.5.dp else 1.dp,
+                                                            color = if (isSelected) currentAccentColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                                        ),
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .height(48.dp)
+                                                    ) {
+                                                        Box(contentAlignment = Alignment.Center) {
+                                                            Icon(
+                                                                iconVector,
+                                                                contentDescription = iconName,
+                                                                tint = if (isSelected) currentAccentColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                modifier = Modifier.size(20.dp)
+                                                            )
+                                                        }
                                                     }
                                                 }
-                                                Spacer(modifier = Modifier.height(6.dp))
-                                                Text(
-                                                    text = themeOption.name,
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
-                                                    color = if (isSelected) themeOption.primaryColor else MaterialTheme.colorScheme.onSurface,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Text(
-                                                    text = themeOption.iconName,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    fontSize = 10.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
+                                                repeat(4 - rowItems.size) {
+                                                    Spacer(modifier = Modifier.weight(1f))
+                                                }
                                             }
                                         }
                                     }
@@ -967,7 +1001,7 @@ fun CreateClubSheet(
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
                                 ),
                                 shape = RoundedCornerShape(16.dp),
-                                border = BorderStroke(1.dp, selectedTheme.primaryColor.copy(alpha = 0.3f)),
+                                border = BorderStroke(1.dp, currentAccentColor.copy(alpha = 0.3f)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(
@@ -1157,8 +1191,8 @@ fun CreateClubSheet(
                                     // Live Cadence Preview Card
                                     Surface(
                                         shape = RoundedCornerShape(10.dp),
-                                        color = selectedTheme.containerColor,
-                                        border = BorderStroke(1.dp, selectedTheme.primaryColor.copy(alpha = 0.35f))
+                                        color = currentContainerColor,
+                                        border = BorderStroke(1.dp, currentAccentColor.copy(alpha = 0.35f))
                                     ) {
                                         Row(
                                             modifier = Modifier
@@ -1169,7 +1203,7 @@ fun CreateClubSheet(
                                             Icon(
                                                 Icons.Default.CalendarToday,
                                                 contentDescription = null,
-                                                tint = selectedTheme.primaryColor,
+                                                tint = currentAccentColor,
                                                 modifier = Modifier.size(16.dp)
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
@@ -1177,13 +1211,13 @@ fun CreateClubSheet(
                                                 Text(
                                                     "Formatted Schedule Preview:",
                                                     style = MaterialTheme.typography.labelSmall,
-                                                    color = selectedTheme.onContainerColor.copy(alpha = 0.7f)
+                                                    color = currentAccentColor.copy(alpha = 0.8f)
                                                 )
                                                 Text(
                                                     text = formattedSchedule,
                                                     style = MaterialTheme.typography.labelMedium,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = selectedTheme.onContainerColor
+                                                    color = currentAccentColor
                                                 )
                                             }
                                         }
@@ -1213,7 +1247,8 @@ fun CreateClubSheet(
                                     modifier = Modifier
                                         .weight(1.3f)
                                         .height(50.dp),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = currentAccentColor)
                                 ) {
                                     Text("Continue to Venue", fontWeight = FontWeight.Bold)
                                     Spacer(modifier = Modifier.width(6.dp))
@@ -1234,7 +1269,7 @@ fun CreateClubSheet(
                                 label = { Text("Meeting Venue or Video Link") },
                                 placeholder = { Text("e.g. Google Meet / Seminar Room 302") },
                                 leadingIcon = {
-                                    Icon(Icons.Outlined.LocationOn, contentDescription = null, tint = selectedTheme.primaryColor)
+                                    Icon(Icons.Outlined.LocationOn, contentDescription = null, tint = currentAccentColor)
                                 },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
@@ -1243,10 +1278,10 @@ fun CreateClubSheet(
                             // Comprehensive Summary Review Card
                             Card(
                                 colors = CardDefaults.cardColors(
-                                    containerColor = selectedTheme.containerColor.copy(alpha = 0.45f)
+                                    containerColor = currentContainerColor.copy(alpha = 0.5f)
                                 ),
                                 shape = RoundedCornerShape(18.dp),
-                                border = BorderStroke(1.5.dp, selectedTheme.primaryColor.copy(alpha = 0.4f)),
+                                border = BorderStroke(1.5.dp, currentAccentColor.copy(alpha = 0.4f)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1254,21 +1289,21 @@ fun CreateClubSheet(
                                         "Club Summary Review",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = selectedTheme.primaryColor
+                                        color = currentAccentColor
                                     )
 
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Surface(
                                             shape = CircleShape,
-                                            color = selectedTheme.containerColor,
-                                            border = BorderStroke(1.5.dp, selectedTheme.primaryColor),
+                                            color = currentContainerColor,
+                                            border = BorderStroke(1.5.dp, currentAccentColor),
                                             modifier = Modifier.size(44.dp)
                                         ) {
                                             Box(contentAlignment = Alignment.Center) {
                                                 Icon(
-                                                    selectedTheme.icon,
+                                                    currentIcon,
                                                     contentDescription = null,
-                                                    tint = selectedTheme.primaryColor,
+                                                    tint = currentAccentColor,
                                                     modifier = Modifier.size(24.dp)
                                                 )
                                             }
@@ -1279,22 +1314,22 @@ fun CreateClubSheet(
                                             Text(
                                                 text = if (focusArea.isNotBlank()) focusArea else "Astrophysics Discussion",
                                                 style = MaterialTheme.typography.bodySmall,
-                                                color = selectedTheme.primaryColor,
+                                                color = currentAccentColor,
                                                 fontWeight = FontWeight.SemiBold
                                             )
                                         }
                                     }
 
-                                    HorizontalDivider(color = selectedTheme.primaryColor.copy(alpha = 0.2f))
+                                    HorizontalDivider(color = currentAccentColor.copy(alpha = 0.2f))
 
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.CalendarToday, contentDescription = null, tint = selectedTheme.primaryColor, modifier = Modifier.size(15.dp))
+                                        Icon(Icons.Default.CalendarToday, contentDescription = null, tint = currentAccentColor, modifier = Modifier.size(15.dp))
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(formattedSchedule, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                                     }
 
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Outlined.LocationOn, contentDescription = null, tint = selectedTheme.primaryColor, modifier = Modifier.size(15.dp))
+                                        Icon(Icons.Outlined.LocationOn, contentDescription = null, tint = currentAccentColor, modifier = Modifier.size(15.dp))
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(location.ifBlank { "Virtual Seminar Room" }, style = MaterialTheme.typography.bodySmall)
                                     }
@@ -1325,10 +1360,16 @@ fun CreateClubSheet(
 
                                 Button(
                                     onClick = {
-                                        val taggedFocusArea = if (focusArea.isNotBlank()) {
-                                            "$focusArea [theme:${selectedTheme.id}]"
-                                        } else {
-                                            "Astrophysics [theme:${selectedTheme.id}]"
+                                        val hex = String.format("#%06X", (0xFFFFFF and android.graphics.Color.rgb(
+                                            (currentAccentColor.red * 255).toInt(),
+                                            (currentAccentColor.green * 255).toInt(),
+                                            (currentAccentColor.blue * 255).toInt()
+                                        )))
+                                        val taggedFocusArea = buildString {
+                                            append(if (focusArea.isNotBlank()) focusArea else "Astrophysics")
+                                            append(" [theme:deep_space]")
+                                            append(" [icon:$selectedIconName]")
+                                            append(" [color:$hex]")
                                         }
                                         onCreate(name, description, taggedFocusArea, formattedSchedule, location)
                                     },
@@ -1336,7 +1377,8 @@ fun CreateClubSheet(
                                     modifier = Modifier
                                         .weight(1.5f)
                                         .height(52.dp),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = currentAccentColor)
                                 ) {
                                     Text("Create Journal Club", fontWeight = FontWeight.Bold)
                                 }
