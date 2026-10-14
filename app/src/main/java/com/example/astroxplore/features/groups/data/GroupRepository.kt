@@ -102,23 +102,30 @@ class GroupRepository @Inject constructor(
     suspend fun syncGroups() = withContext(Dispatchers.IO) {
         val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return@withContext
         try {
-            val memberships = supabaseClient.postgrest["group_members"]
-                .select(columns = Columns.ALL) {
-                    filter { eq("user_id", userId) }
-                }
-                .decodeList<GroupMemberModel>()
+            val memberships = try {
+                supabaseClient.postgrest["group_members"]
+                    .select(columns = Columns.ALL) {
+                        filter { eq("user_id", userId) }
+                    }
+                    .decodeList<GroupMemberModel>()
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                e.printStackTrace()
+                emptyList()
+            }
 
             val memberGroupIds = memberships.map { it.groupId }.toSet()
 
-            val remoteGroups = supabaseClient.postgrest["groups"]
-                .select(columns = Columns.ALL) {
-                    filter {
-                        eq("status", "active")
-                    }
-                }
-                .decodeList<GroupModel>()
+            val remoteGroups = try {
+                supabaseClient.postgrest["groups"]
+                    .select(columns = Columns.ALL)
+                    .decodeList<GroupModel>()
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                e.printStackTrace()
+                emptyList()
+            }
 
-            groupDao.deleteAllSyncedGroups()
             if (remoteGroups.isNotEmpty()) {
                 val entities = remoteGroups.map { group ->
                     val isMember = memberGroupIds.contains(group.id) || group.ownerId == userId
@@ -127,14 +134,17 @@ class GroupRepository @Inject constructor(
                 groupDao.insertGroups(entities)
 
                 remoteGroups.filter { memberGroupIds.contains(it.id) || it.ownerId == userId }.forEach { group ->
-                    syncGroupPapers(group.id)
-                    syncGroupMembers(group.id)
-                    syncGroupPresentations(group.id)
-                    syncGroupReviews(group.id)
+                    try {
+                        syncGroupPapers(group.id)
+                        syncGroupMembers(group.id)
+                        syncGroupPresentations(group.id)
+                        syncGroupReviews(group.id)
+                    } catch (_: Exception) {}
                 }
             }
-        } catch (_: Exception) {
-            // Offline fallback - local room database holds active state
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            e.printStackTrace()
         }
     }
 
@@ -239,7 +249,10 @@ class GroupRepository @Inject constructor(
                             "description" to (localGroup.description ?: ""),
                             "focus_area" to (localGroup.focusArea ?: ""),
                             "owner_id" to userId,
-                            "visibility" to localGroup.visibility
+                            "visibility" to localGroup.visibility,
+                            "status" to "active",
+                            "is_public" to true,
+                            "member_count" to 1
                         )
                         val inserted = supabaseClient.postgrest["groups"]
                             .insert(groupPayload) { select() }
@@ -457,7 +470,10 @@ class GroupRepository @Inject constructor(
                     "description" to (description ?: ""),
                     "focus_area" to (focusArea ?: ""),
                     "owner_id" to currentUserId,
-                    "visibility" to "public"
+                    "visibility" to "public",
+                    "status" to "active",
+                    "is_public" to true,
+                    "member_count" to 1
                 )
                 val inserted = supabaseClient.postgrest["groups"]
                     .insert(groupPayload) { select() }

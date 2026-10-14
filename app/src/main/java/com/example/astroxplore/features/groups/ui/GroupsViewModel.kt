@@ -64,7 +64,7 @@ class GroupsViewModel @Inject constructor(
         viewModelScope.launch {
             isOnline.collect { online ->
                 if (online) {
-                    groupRepository.syncPendingMutations()
+                    syncGroups()
                 }
             }
         }
@@ -73,8 +73,15 @@ class GroupsViewModel @Inject constructor(
     fun syncGroups() {
         viewModelScope.launch {
             _isRefreshing.value = true
-            groupRepository.syncPendingMutations()
-            _isRefreshing.value = false
+            try {
+                groupRepository.syncPendingMutations()
+                groupRepository.syncGroups()
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                e.printStackTrace()
+            } finally {
+                _isRefreshing.value = false
+            }
         }
     }
 
@@ -89,6 +96,7 @@ class GroupsViewModel @Inject constructor(
             try {
                 val created = groupRepository.createGroup(name, description, focusArea, schedule, location)
                 _messages.emit("Created \"${created.name}\" successfully!")
+                syncGroups()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {

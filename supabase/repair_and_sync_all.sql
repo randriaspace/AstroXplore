@@ -368,9 +368,6 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public, auth
 AS $$
     SELECT EXISTS (
-        SELECT 1 FROM public.groups
-        WHERE id = p_group_id AND owner_id = auth.uid()
-        UNION
         SELECT 1 FROM public.group_members
         WHERE group_id = p_group_id AND user_id = auth.uid()
     );
@@ -385,13 +382,10 @@ SET search_path = pg_catalog, public, auth
 AS $$
     SELECT EXISTS (
         SELECT 1 FROM public.groups
-        WHERE id = p_group_id AND (visibility = 'public' OR is_public = TRUE)
+        WHERE id = p_group_id AND (visibility = 'public' OR is_public = TRUE OR owner_id = auth.uid())
         UNION
         SELECT 1 FROM public.group_members
         WHERE group_id = p_group_id AND user_id = auth.uid()
-        UNION
-        SELECT 1 FROM public.groups
-        WHERE id = p_group_id AND owner_id = auth.uid()
     );
 $$;
 
@@ -822,7 +816,7 @@ CREATE POLICY groups_update_policy ON public.groups
 DROP POLICY IF EXISTS group_members_select_policy ON public.group_members;
 CREATE POLICY group_members_select_policy ON public.group_members
     FOR SELECT TO authenticated
-    USING (public.can_read_group(group_id));
+    USING (user_id = auth.uid() OR public.can_read_group(group_id));
 
 DROP POLICY IF EXISTS group_members_insert_policy ON public.group_members;
 CREATE POLICY group_members_insert_policy ON public.group_members
