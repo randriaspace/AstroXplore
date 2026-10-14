@@ -128,13 +128,15 @@ class EditProfileViewModel @Inject constructor(
         orcidId: String?
     ) {
         val user = authRepository.currentUser
+        val userEmail = user?.email ?: (uiState.value as? EditProfileUiState.Success)?.profile?.email ?: ""
         val currentProfile = (uiState.value as? EditProfileUiState.Success)?.profile
             ?: ProfileModel(
                 id = user?.id ?: "local_user",
-                email = user?.email ?: ""
+                email = userEmail
             )
 
         val updatedProfile = currentProfile.copy(
+            email = if (currentProfile.email.isNotBlank()) currentProfile.email else userEmail,
             firstName = firstName,
             lastName = lastName,
             fullName = listOf(firstName, lastName).filter { it.isNotBlank() }.joinToString(" "),

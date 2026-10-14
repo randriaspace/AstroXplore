@@ -71,7 +71,14 @@ class ProfileRepository @Inject constructor(
                     isOnboarded = false
                 )
                 try {
-                    supabaseClient.postgrest["profiles"].upsert(newProfile)
+                    val payload = buildMap<String, Any> {
+                        put("id", userId)
+                        put("email", email)
+                        put("full_name", fullName)
+                        put("institution", "Independent Researcher")
+                        put("is_onboarded", false)
+                    }
+                    supabaseClient.postgrest["profiles"].upsert(payload)
                     profileDao.insertProfile(newProfile.toEntity(isSynced = true))
                     newProfile
                 } catch (upsertEx: Exception) {
@@ -140,9 +147,24 @@ class ProfileRepository @Inject constructor(
         profileDao.insertProfile(profile.toEntity(isSynced = false))
         
         try {
-            supabaseClient.postgrest["profiles"].upsert(profile)
+            val payload = buildMap<String, Any> {
+                put("id", profile.id)
+                put("email", profile.email)
+                profile.fullName?.let { put("full_name", it) }
+                profile.firstName?.let { put("first_name", it) }
+                profile.lastName?.let { put("last_name", it) }
+                profile.institution?.let { put("institution", it) }
+                profile.affiliationType?.let { put("affiliation_type", it) }
+                profile.affiliationName?.let { put("affiliation_name", it) }
+                profile.country?.let { put("country", it) }
+                profile.educationLevel?.let { put("education_level", it) }
+                profile.orcidId?.let { put("orcid_id", it) }
+                put("is_onboarded", profile.isOnboarded)
+            }
+            supabaseClient.postgrest["profiles"].upsert(payload)
             profileDao.insertProfile(profile.toEntity(isSynced = true))
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             e.printStackTrace()
         }
     }

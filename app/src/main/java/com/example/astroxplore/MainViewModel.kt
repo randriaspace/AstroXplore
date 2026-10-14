@@ -9,6 +9,7 @@ import com.example.astroxplore.features.profile.data.ProfileRepository
 import com.example.astroxplore.core.network.NetworkConnectivityObserver
 import com.example.astroxplore.features.library.data.LibraryRepository
 import com.example.astroxplore.features.groups.data.GroupRepository
+import com.example.astroxplore.core.database.ThemeMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.*
@@ -41,6 +42,20 @@ class MainViewModel @Inject constructor(
 
     private val _isInitTimeout = MutableStateFlow(false)
     val isInitTimeout: StateFlow<Boolean> = _isInitTimeout.asStateFlow()
+
+    val themeMode: StateFlow<ThemeMode> = settingsRepository.themeMode
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = ThemeMode.SYSTEM
+        )
+
+    val dynamicColorEnabled: StateFlow<Boolean> = settingsRepository.dynamicColorEnabled
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
 
     private val _isOnboarded = MutableStateFlow<Boolean?>(null)
     val isOnboarded: StateFlow<Boolean?> = _isOnboarded.asStateFlow()

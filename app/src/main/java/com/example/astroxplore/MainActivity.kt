@@ -71,21 +71,22 @@ class MainActivity : ComponentActivity() {
                 sessionStatus == SessionStatus.Initializing && !isInitTimeout
             }
 
-            val profileViewModel: ProfileViewModel = hiltViewModel()
-            val settingsState by profileViewModel.uiState.collectAsState()
+            val themeMode by mainViewModel.themeMode.collectAsState()
+            val dynamicColorEnabled by mainViewModel.dynamicColorEnabled.collectAsState()
 
-            val darkTheme = when (settingsState.themeMode) {
+            val darkTheme = when (themeMode) {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
             }
 
+            val navController = rememberNavController()
+
             AstroXploreTheme(
                 darkTheme = darkTheme,
-                dynamicColor = settingsState.dynamicColorEnabled,
+                dynamicColor = dynamicColorEnabled,
             ) {
                 val isOnboarded by mainViewModel.isOnboarded.collectAsState()
-                val navController = rememberNavController()
                 AstroXploreMain(
                     sessionStatus = sessionStatus,
                     isOnboarded = isOnboarded,
@@ -111,11 +112,11 @@ fun AstroXploreMain(
     // or if 2-second timeout elapsed (offline launch), immediately unblock.
     val isReady = isInitTimeout || sessionStatus !is SessionStatus.Initializing
 
-    val startDestination = remember(isReady, sessionStatus, isOnboarded, isInitTimeout) {
+    val startDestination = remember(isReady, sessionStatus) {
         if (!isReady) null
-        else when {
-            sessionStatus is SessionStatus.Authenticated -> Screen.MainGraph
-            sessionStatus is SessionStatus.NotAuthenticated -> Screen.AuthGraph
+        else when (sessionStatus) {
+            is SessionStatus.Authenticated -> Screen.MainGraph
+            is SessionStatus.NotAuthenticated -> Screen.AuthGraph
             else -> Screen.MainGraph
         }
     }
