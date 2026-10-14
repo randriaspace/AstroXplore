@@ -587,27 +587,80 @@ fun CreateClubSheet(
     var focusArea by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("Virtual Seminar Room") }
 
-    // Multi-day, Multi-time, Frequency Scheduler State
-    val frequencies = listOf("Weekly", "Bi-weekly", "Monthly", "Twice a week")
+    // Meeting Scheduler State (Weekly & Monthly)
+    val frequencies = listOf("Weekly", "Monthly")
     var selectedFrequency by remember { mutableStateOf("Weekly") }
 
+    // Weekly parameters: 7 days of the week, multi-select
     val daysOfWeek = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
     var selectedDays by remember { mutableStateOf(setOf("Thu")) }
 
+    // Monthly parameters: By Weekday (e.g., 1st Thursday) or By Date (e.g., 15th)
+    var monthlyMode by remember { mutableStateOf("By Weekday") } // "By Weekday" or "By Date"
+    val weekOrdinals = listOf("1st", "2nd", "3rd", "4th", "Last")
+    var selectedOrdinal by remember { mutableStateOf("1st") }
+    var selectedMonthlyDay by remember { mutableStateOf("Thu") }
+
+    val monthlyPresetDates = listOf("1st", "10th", "15th", "20th", "25th", "Last day")
+    var selectedMonthlyDate by remember { mutableStateOf("1st") }
+    var isCustomMonthlyDate by remember { mutableStateOf(false) }
+    var customDayNumber by remember { mutableStateOf("1") }
+
+    // Meeting Time State
     val presetTimes = listOf("9:00 AM", "11:00 AM", "2:00 PM", "4:00 PM", "6:00 PM")
     var selectedTime by remember { mutableStateOf("4:00 PM") }
     var isCustomTime by remember { mutableStateOf(false) }
     var customTimeInput by remember { mutableStateOf("") }
 
     // Dynamic schedule preview formulation
-    val formattedSchedule = remember(selectedFrequency, selectedDays, selectedTime, isCustomTime, customTimeInput) {
+    val formattedSchedule = remember(
+        selectedFrequency,
+        selectedDays,
+        monthlyMode,
+        selectedOrdinal,
+        selectedMonthlyDay,
+        selectedMonthlyDate,
+        isCustomMonthlyDate,
+        customDayNumber,
+        selectedTime,
+        isCustomTime,
+        customTimeInput
+    ) {
         val timeStr = if (isCustomTime && customTimeInput.isNotBlank()) customTimeInput.trim() else selectedTime
-        val daysStr = if (selectedDays.isEmpty()) {
-            "Select days"
+        if (selectedFrequency == "Weekly") {
+            val daysStr = if (selectedDays.isEmpty()) {
+                "Select days"
+            } else {
+                daysOfWeek.filter { selectedDays.contains(it) }.joinToString(", ")
+            }
+            "Weekly on $daysStr at $timeStr"
         } else {
-            daysOfWeek.filter { selectedDays.contains(it) }.joinToString(", ")
+            // Monthly
+            if (monthlyMode == "By Weekday") {
+                "Monthly on the $selectedOrdinal $selectedMonthlyDay at $timeStr"
+            } else {
+                val dateStr = if (isCustomMonthlyDate && customDayNumber.isNotBlank()) {
+                    val num = customDayNumber.toIntOrNull()?.coerceIn(1, 31) ?: 1
+                    val suffix = when {
+                        num in 11..13 -> "th"
+                        num % 10 == 1 -> "st"
+                        num % 10 == 2 -> "nd"
+                        num % 10 == 3 -> "rd"
+                        else -> "th"
+                    }
+                    "$num$suffix"
+                } else {
+                    selectedMonthlyDate
+                }
+                "Monthly on the $dateStr at $timeStr"
+            }
         }
-        "$selectedFrequency on $daysStr at $timeStr"
+    }
+
+    val isScheduleValid = if (selectedFrequency == "Weekly") {
+        selectedDays.isNotEmpty()
+    } else {
+        true
     }
 
     val quickTopics = listOf("Exoplanets", "JWST Galaxies", "Gravitational Waves", "Black Holes", "Cosmology", "Fast Radio Bursts")
@@ -716,52 +769,148 @@ fun CreateClubSheet(
                         )
                     }
 
-                    // 1. Frequency
+                    // 1. Frequency (Weekly or Monthly)
                     Text(
                         "Frequency:",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(frequencies) { freq ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        frequencies.forEach { freq ->
                             FilterChip(
                                 selected = selectedFrequency == freq,
                                 onClick = { selectedFrequency = freq },
-                                label = { Text(freq, fontSize = 12.sp) }
+                                label = { Text(freq, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                             )
                         }
                     }
 
-                    // 2. Meeting Days (Multi-select)
-                    Text(
-                        "Meeting Days (Select one or multiple):",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        daysOfWeek.forEach { day ->
-                            val isSelected = selectedDays.contains(day)
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = {
-                                    selectedDays = if (isSelected) {
-                                        if (selectedDays.size > 1) selectedDays - day else selectedDays
-                                    } else {
-                                        selectedDays + day
-                                    }
-                                },
-                                label = {
-                                    Text(
-                                        day,
-                                        fontSize = 11.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                },
-                                modifier = Modifier.height(34.dp)
+                    // 2. Logic parameters based on frequency choice
+                    if (selectedFrequency == "Weekly") {
+                        // Weekly: Multi-select 7 days of the week
+                        Text(
+                            "Meeting Days (Select one or multiple):",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            daysOfWeek.forEach { day ->
+                                val isSelected = selectedDays.contains(day)
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        selectedDays = if (isSelected) {
+                                            if (selectedDays.size > 1) selectedDays - day else selectedDays
+                                        } else {
+                                            selectedDays + day
+                                        }
+                                    },
+                                    label = {
+                                        Text(
+                                            day,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    modifier = Modifier.height(34.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        // Monthly: Choose logical recurrence parameters
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                "Monthly Recurrence Pattern:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                listOf("By Weekday", "By Date").forEach { mode ->
+                                    FilterChip(
+                                        selected = monthlyMode == mode,
+                                        onClick = { monthlyMode = mode },
+                                        label = { Text(mode, fontSize = 11.sp) }
+                                    )
+                                }
+                            }
+
+                            if (monthlyMode == "By Weekday") {
+                                // Week Ordinal (1st, 2nd, 3rd, 4th, Last)
+                                Text(
+                                    "Which Week of the Month:",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    items(weekOrdinals) { ord ->
+                                        FilterChip(
+                                            selected = selectedOrdinal == ord,
+                                            onClick = { selectedOrdinal = ord },
+                                            label = { Text(ord, fontSize = 11.sp) }
+                                        )
+                                    }
+                                }
+
+                                // Weekday of the Month (Mon, Tue, Wed, Thu, Fri, Sat, Sun)
+                                Text(
+                                    "Day of the Week:",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    daysOfWeek.forEach { day ->
+                                        FilterChip(
+                                            selected = selectedMonthlyDay == day,
+                                            onClick = { selectedMonthlyDay = day },
+                                            label = { Text(day, fontSize = 11.sp) },
+                                            modifier = Modifier.height(34.dp)
+                                        )
+                                    }
+                                }
+                            } else {
+                                // By Date of Month
+                                Text(
+                                    "Date of the Month:",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    items(monthlyPresetDates) { pDate ->
+                                        FilterChip(
+                                            selected = !isCustomMonthlyDate && selectedMonthlyDate == pDate,
+                                            onClick = {
+                                                isCustomMonthlyDate = false
+                                                selectedMonthlyDate = pDate
+                                            },
+                                            label = { Text(pDate, fontSize = 11.sp) }
+                                        )
+                                    }
+                                    item {
+                                        FilterChip(
+                                            selected = isCustomMonthlyDate,
+                                            onClick = { isCustomMonthlyDate = true },
+                                            label = { Text("Custom Day", fontSize = 11.sp) }
+                                        )
+                                    }
+                                }
+
+                                AnimatedVisibility(visible = isCustomMonthlyDate) {
+                                    OutlinedTextField(
+                                        value = customDayNumber,
+                                        onValueChange = { customDayNumber = it.filter { ch -> ch.isDigit() }.take(2) },
+                                        label = { Text("Day of Month (1 - 31)") },
+                                        placeholder = { Text("15") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -877,7 +1026,7 @@ fun CreateClubSheet(
 
             Button(
                 onClick = { onCreate(name, description, focusArea, formattedSchedule, location) },
-                enabled = name.isNotBlank() && selectedDays.isNotEmpty(),
+                enabled = name.isNotBlank() && isScheduleValid,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
