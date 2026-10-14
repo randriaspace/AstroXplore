@@ -15,6 +15,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.Locale
+import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 
 data class ProfileUiState(
@@ -99,7 +100,28 @@ class ProfileViewModel @Inject constructor(
 
     fun loadData() {
         val user = authRepository.currentUser
-        val userId = user?.id ?: return
+        val userId = user?.id ?: run {
+            _isLoading.value = false
+            return
+        }
+
+        // Build immediate fallback from user metadata so profile card displays instantly
+        val metadata = user.userMetadata
+        val metadataMap = metadata?.entries?.associate { it.key to it.value.jsonPrimitive.content }
+        val firstNameFromAuth = metadataMap?.get("first_name") ?: ""
+        val lastNameFromAuth = metadataMap?.get("last_name") ?: ""
+        val fullNameFromAuth = metadataMap?.get("full_name")
+            ?: listOf(firstNameFromAuth, lastNameFromAuth).filter { it.isNotBlank() }.joinToString(" ").ifBlank { "Scholar" }
+
+        val fallbackDto = UserProfileDto(
+            id = userId,
+            fullName = fullNameFromAuth,
+            institution = "Independent Researcher",
+            orcidId = null,
+            selectedTopics = emptyList()
+        )
+        _userProfile.value = fallbackDto
+
         viewModelScope.launch {
             _isLoading.value = true
             

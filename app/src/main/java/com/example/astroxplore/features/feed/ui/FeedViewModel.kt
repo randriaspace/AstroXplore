@@ -18,6 +18,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -67,9 +68,27 @@ class FeedViewModel @Inject constructor(
         )
 
     val userProfile: StateFlow<ProfileModel?> = flow {
-        val userId = authRepository.currentUser?.id
+        val user = authRepository.currentUser
+        val userId = user?.id
         if (userId != null) {
-            emitAll(profileRepository.getLocalProfile(userId))
+            val metadata = user.userMetadata
+            val metadataMap = metadata?.entries?.associate { it.key to it.value.jsonPrimitive.content }
+            val firstName = metadataMap?.get("first_name") ?: ""
+            val lastName = metadataMap?.get("last_name") ?: ""
+            val fullName = metadataMap?.get("full_name")
+                ?: listOf(firstName, lastName).filter { it.isNotBlank() }.joinToString(" ").ifBlank { "Scholar" }
+            val fallback = ProfileModel(
+                id = userId,
+                email = user.email ?: "",
+                firstName = firstName,
+                lastName = lastName,
+                fullName = fullName,
+                isOnboarded = false
+            )
+            emit(fallback)
+            emitAll(
+                profileRepository.getLocalProfile(userId).map { it ?: fallback }
+            )
         } else {
             emit(null)
         }

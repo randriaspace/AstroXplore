@@ -3,13 +3,14 @@
 -- ============================================================================
 -- Purpose:
 --   Runs seamlessly in Supabase SQL Editor to create or repair all tables,
---   columns, indexes, Row-Level Security (RLS) policies, and RPC stored
---   procedures without dropping existing tables or causing data loss.
+--   columns, indexes, triggers, Row-Level Security (RLS) policies, and RPC
+--   stored procedures without dropping existing tables or causing data loss.
 --
 -- Safety:
 --   - Uses CREATE TABLE IF NOT EXISTS
 --   - Uses ALTER TABLE ... ADD COLUMN IF NOT EXISTS
---   - Uses CREATE OR REPLACE FUNCTION
+--   - Drops obsolete function signatures before recreating (avoids Error 42P13)
+--   - Automatically creates and backfills profiles for all auth.users
 --   - Completely idempotent: safe to run repeatedly on empty or live databases
 -- ============================================================================
 
@@ -148,75 +149,77 @@ CREATE TABLE IF NOT EXISTS public.group_join_requests (
     group_id UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     status TEXT NOT NULL DEFAULT 'pending',
+    message TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    reviewed_at TIMESTAMPTZ,
-    reviewed_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT group_join_requests_group_user_key UNIQUE (group_id, user_id)
 );
 
 -- ----------------------------------------------------------------------------
--- 7. Group Papers (Nominated Preprints for Discussion Shelf)
+-- 7. Group Papers (Queue / Reading List)
 -- ----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.group_papers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     group_id UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
     bibcode TEXT NOT NULL,
-    added_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-    vote_count INTEGER NOT NULL DEFAULT 0,
     title TEXT,
     authors TEXT,
-    year TEXT,
-    added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    abstract TEXT,
+    added_by UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    votes_count INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'proposed',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT group_papers_group_bibcode_key UNIQUE (group_id, bibcode)
 );
 
 ALTER TABLE public.group_papers ADD COLUMN IF NOT EXISTS title TEXT;
 ALTER TABLE public.group_papers ADD COLUMN IF NOT EXISTS authors TEXT;
-ALTER TABLE public.group_papers ADD COLUMN IF NOT EXISTS year TEXT;
-ALTER TABLE public.group_papers ADD COLUMN IF NOT EXISTS vote_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE public.group_papers ADD COLUMN IF NOT EXISTS abstract TEXT;
+ALTER TABLE public.group_papers ADD COLUMN IF NOT EXISTS votes_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE public.group_papers ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'proposed';
 
 -- ----------------------------------------------------------------------------
--- 8. Group Paper Consensus Votes
+-- 8. Group Paper Votes
 -- ----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.group_paper_votes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    group_id UUID REFERENCES public.groups(id) ON DELETE CASCADE,
-    bibcode TEXT,
-    group_paper_id UUID REFERENCES public.group_papers(id) ON DELETE CASCADE,
+    group_paper_id UUID NOT NULL REFERENCES public.group_papers(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT group_paper_votes_paper_user_key UNIQUE (group_paper_id, user_id)
 );
 
-ALTER TABLE public.group_paper_votes ADD COLUMN IF NOT EXISTS group_id UUID REFERENCES public.groups(id) ON DELETE CASCADE;
-ALTER TABLE public.group_paper_votes ADD COLUMN IF NOT EXISTS bibcode TEXT;
-ALTER TABLE public.group_paper_votes ADD COLUMN IF NOT EXISTS group_paper_id UUID REFERENCES public.group_papers(id) ON DELETE CASCADE;
-
 -- ----------------------------------------------------------------------------
--- 9. Seminar Presentations & Meetings
+-- 9. Group Sessions (Presentations)
 -- ----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.group_presentations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     group_id UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
-    bibcode TEXT NOT NULL,
-    presenter_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    bibcode TEXT,
     title TEXT,
+    presenter_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    presenter_name TEXT,
     scheduled_at TIMESTAMPTZ NOT NULL,
     ends_at TIMESTAMPTZ,
     time_zone TEXT NOT NULL DEFAULT 'UTC',
+    location TEXT,
     agenda TEXT,
-    meeting_location TEXT DEFAULT 'Virtual Seminar Room',
     status TEXT NOT NULL DEFAULT 'scheduled',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-ALTER TABLE public.group_presentations ADD COLUMN IF NOT EXISTS meeting_location TEXT DEFAULT 'Virtual Seminar Room';
+ALTER TABLE public.group_presentations ADD COLUMN IF NOT EXISTS presenter_name TEXT;
+ALTER TABLE public.group_presentations ADD COLUMN IF NOT EXISTS ends_at TIMESTAMPTZ;
+ALTER TABLE public.group_presentations ADD COLUMN IF NOT EXISTS location TEXT;
+ALTER TABLE public.group_presentations ADD COLUMN IF NOT EXISTS agenda TEXT;
+ALTER TABLE public.group_presentations ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'scheduled';
 
 -- ----------------------------------------------------------------------------
--- 10. Session RSVPs & Attendance Check-In
+-- 10. Session RSVPs & Attendance Tracking
 -- ----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.group_session_rsvps (
@@ -224,8 +227,9 @@ CREATE TABLE IF NOT EXISTS public.group_session_rsvps (
     presentation_id UUID NOT NULL REFERENCES public.group_presentations(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     response TEXT NOT NULL DEFAULT 'attending',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT group_session_rsvps_session_user_key UNIQUE (presentation_id, user_id)
+    CONSTRAINT group_session_rsvps_presentation_user_key UNIQUE (presentation_id, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS public.group_session_attendance (
@@ -233,11 +237,11 @@ CREATE TABLE IF NOT EXISTS public.group_session_attendance (
     presentation_id UUID NOT NULL REFERENCES public.group_presentations(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     checked_in_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT group_session_attendance_session_user_key UNIQUE (presentation_id, user_id)
+    CONSTRAINT group_session_attendance_presentation_user_key UNIQUE (presentation_id, user_id)
 );
 
 -- ----------------------------------------------------------------------------
--- 11. Peer Reviews & Session Discussion Recaps
+-- 11. Session Reviews & Takeaways
 -- ----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.group_session_reviews (
@@ -255,7 +259,56 @@ CREATE TABLE IF NOT EXISTS public.group_session_reviews (
 ALTER TABLE public.group_session_reviews ADD COLUMN IF NOT EXISTS takeaways TEXT[] DEFAULT '{}';
 
 -- ----------------------------------------------------------------------------
--- 12. Drop Existing Functions to Avoid Return Type Mismatch (Error 42P13)
+-- 12. Automated Profile Creation & Backfill Trigger
+-- ----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+    INSERT INTO public.profiles (id, email, full_name, first_name, last_name, is_onboarded)
+    VALUES (
+        NEW.id,
+        COALESCE(NEW.email, ''),
+        COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
+        COALESCE(NEW.raw_user_meta_data->>'first_name', ''),
+        COALESCE(NEW.raw_user_meta_data->>'last_name', ''),
+        FALSE
+    )
+    ON CONFLICT (id) DO UPDATE SET
+        email = EXCLUDED.email,
+        full_name = COALESCE(NULLIF(EXCLUDED.full_name, ''), public.profiles.full_name),
+        first_name = COALESCE(NULLIF(EXCLUDED.first_name, ''), public.profiles.first_name),
+        last_name = COALESCE(NULLIF(EXCLUDED.last_name, ''), public.profiles.last_name);
+
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+GRANT EXECUTE ON FUNCTION public.handle_new_user() TO authenticated, service_role, anon;
+
+-- Backfill any existing auth.users who do not have a public.profiles record
+INSERT INTO public.profiles (id, email, full_name, first_name, last_name, is_onboarded)
+SELECT 
+    id, 
+    COALESCE(email, ''), 
+    COALESCE(raw_user_meta_data->>'full_name', ''), 
+    COALESCE(raw_user_meta_data->>'first_name', ''), 
+    COALESCE(raw_user_meta_data->>'last_name', ''), 
+    FALSE
+FROM auth.users
+ON CONFLICT (id) DO NOTHING;
+
+-- ----------------------------------------------------------------------------
+-- 13. Drop Functions Before Creation to Prevent Return Type Error (42P13)
 -- ----------------------------------------------------------------------------
 
 DROP FUNCTION IF EXISTS public.check_in_session(UUID) CASCADE;
@@ -288,7 +341,7 @@ DROP FUNCTION IF EXISTS private.is_group_admin(UUID) CASCADE;
 DROP FUNCTION IF EXISTS private.is_group_admin CASCADE;
 
 -- ----------------------------------------------------------------------------
--- 13. Security & Role Helper Functions
+-- 14. Security & Role Helper Functions
 -- ----------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION private.is_group_admin(p_group_id UUID)
@@ -298,17 +351,12 @@ STABLE
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth
 AS $$
-    SELECT auth.uid() IS NOT NULL AND (
-        EXISTS (
-            SELECT 1 FROM public.groups AS g
-            WHERE g.id = p_group_id AND g.owner_id = auth.uid()
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.group_members AS gm
-            WHERE gm.group_id = p_group_id
-              AND gm.user_id = auth.uid()
-              AND gm.role IN ('owner', 'admin')
-        )
+    SELECT EXISTS (
+        SELECT 1 FROM public.groups
+        WHERE id = p_group_id AND owner_id = auth.uid()
+        UNION
+        SELECT 1 FROM public.group_members
+        WHERE group_id = p_group_id AND user_id = auth.uid() AND role IN ('owner', 'admin')
     );
 $$;
 
@@ -319,15 +367,12 @@ STABLE
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth
 AS $$
-    SELECT auth.uid() IS NOT NULL AND (
-        EXISTS (
-            SELECT 1 FROM public.groups AS g
-            WHERE g.id = p_group_id AND g.owner_id = auth.uid()
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.group_members AS gm
-            WHERE gm.group_id = p_group_id AND gm.user_id = auth.uid()
-        )
+    SELECT EXISTS (
+        SELECT 1 FROM public.groups
+        WHERE id = p_group_id AND owner_id = auth.uid()
+        UNION
+        SELECT 1 FROM public.group_members
+        WHERE group_id = p_group_id AND user_id = auth.uid()
     );
 $$;
 
@@ -338,20 +383,20 @@ STABLE
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth
 AS $$
-    SELECT auth.uid() IS NOT NULL AND EXISTS (
-        SELECT 1 FROM public.groups AS g
-        WHERE g.id = p_group_id
-          AND (
-              COALESCE(g.visibility, 'public') = 'public'
-              OR COALESCE(g.is_public, TRUE) = TRUE
-              OR g.owner_id = auth.uid()
-              OR public.is_group_member(g.id)
-          )
+    SELECT EXISTS (
+        SELECT 1 FROM public.groups
+        WHERE id = p_group_id AND (visibility = 'public' OR is_public = TRUE)
+        UNION
+        SELECT 1 FROM public.group_members
+        WHERE group_id = p_group_id AND user_id = auth.uid()
+        UNION
+        SELECT 1 FROM public.groups
+        WHERE id = p_group_id AND owner_id = auth.uid()
     );
 $$;
 
 -- ----------------------------------------------------------------------------
--- 14. Stored Procedures (RPCs)
+-- 15. Stored Procedures (RPCs)
 -- ----------------------------------------------------------------------------
 
 -- RPC: create_group
@@ -361,33 +406,52 @@ CREATE OR REPLACE FUNCTION public.create_group(
     p_focus_area TEXT DEFAULT NULL,
     p_visibility TEXT DEFAULT 'public'
 )
-RETURNS SETOF public.groups
+RETURNS TABLE (
+    id UUID,
+    display_id TEXT,
+    name TEXT,
+    description TEXT,
+    focus_area TEXT,
+    visibility TEXT,
+    status TEXT,
+    is_public BOOLEAN,
+    member_count INTEGER,
+    owner_id UUID,
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ
+)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth
 AS $$
 DECLARE
     v_user_id UUID := auth.uid();
-    v_display_id TEXT;
-    v_group public.groups%ROWTYPE;
+    v_group_id UUID := gen_random_uuid();
+    v_display_id TEXT := 'grp_' || substr(md5(random()::text), 1, 8);
+    v_is_public BOOLEAN := (COALESCE(p_visibility, 'public') = 'public');
 BEGIN
     IF v_user_id IS NULL THEN
         RAISE EXCEPTION 'Authentication required' USING ERRCODE = '42501';
     END IF;
 
-    -- Generate human-readable uppercase display ID
-    v_display_id := 'ASTRO' || UPPER(SUBSTRING(REPLACE(gen_random_uuid()::TEXT, '-', ''), 1, 5));
+    IF trim(COALESCE(p_name, '')) = '' THEN
+        RAISE EXCEPTION 'Group name cannot be empty' USING ERRCODE = '22023';
+    END IF;
 
-    INSERT INTO public.groups (display_id, name, description, owner_id, focus_area, visibility, is_public, member_count)
-    VALUES (v_display_id, TRIM(p_name), p_description, v_user_id, p_focus_area, p_visibility, (p_visibility = 'public'), 1)
-    RETURNING * INTO v_group;
+    INSERT INTO public.groups (
+        id, display_id, name, description, focus_area, visibility, status, is_public, member_count, owner_id
+    ) VALUES (
+        v_group_id, v_display_id, trim(p_name), p_description, p_focus_area, COALESCE(p_visibility, 'public'), 'active', v_is_public, 1, v_user_id
+    );
 
-    -- Automatically enroll creator as Admin
     INSERT INTO public.group_members (group_id, user_id, role)
-    VALUES (v_group.id, v_user_id, 'admin')
-    ON CONFLICT (group_id, user_id) DO UPDATE SET role = 'admin';
+    VALUES (v_group_id, v_user_id, 'owner')
+    ON CONFLICT (group_id, user_id) DO UPDATE SET role = 'owner';
 
-    RETURN NEXT v_group;
+    RETURN QUERY
+    SELECT g.id, g.display_id, g.name, g.description, g.focus_area, g.visibility, g.status, g.is_public, g.member_count, g.owner_id, g.created_at, g.updated_at
+    FROM public.groups g
+    WHERE g.id = v_group_id;
 END;
 $$;
 
@@ -400,21 +464,38 @@ SET search_path = pg_catalog, public, auth
 AS $$
 DECLARE
     v_user_id UUID := auth.uid();
+    v_visibility TEXT;
 BEGIN
     IF v_user_id IS NULL THEN
         RAISE EXCEPTION 'Authentication required' USING ERRCODE = '42501';
     END IF;
 
-    -- If already member, return immediately
+    SELECT visibility INTO v_visibility FROM public.groups WHERE id = p_group_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Group not found' USING ERRCODE = 'P0002';
+    END IF;
+
     IF EXISTS (SELECT 1 FROM public.group_members WHERE group_id = p_group_id AND user_id = v_user_id) THEN
         RETURN TRUE;
     END IF;
 
-    INSERT INTO public.group_join_requests (group_id, user_id, status)
-    VALUES (p_group_id, v_user_id, 'pending')
-    ON CONFLICT (group_id, user_id) DO UPDATE SET status = 'pending';
+    IF v_visibility = 'public' THEN
+        INSERT INTO public.group_members (group_id, user_id, role)
+        VALUES (p_group_id, v_user_id, 'member')
+        ON CONFLICT (group_id, user_id) DO NOTHING;
 
-    RETURN TRUE;
+        UPDATE public.groups
+        SET member_count = (SELECT COUNT(*) FROM public.group_members WHERE group_id = p_group_id)
+        WHERE id = p_group_id;
+
+        RETURN TRUE;
+    ELSE
+        INSERT INTO public.group_join_requests (group_id, user_id, status)
+        VALUES (p_group_id, v_user_id, 'pending')
+        ON CONFLICT (group_id, user_id) DO UPDATE SET status = 'pending', updated_at = NOW();
+
+        RETURN TRUE;
+    END IF;
 END;
 $$;
 
@@ -426,62 +507,54 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public, auth
 AS $$
 DECLARE
-    v_group_id UUID;
-    v_applicant_id UUID;
+    v_req RECORD;
 BEGIN
-    SELECT group_id, user_id INTO v_group_id, v_applicant_id
-    FROM public.group_join_requests
-    WHERE id = p_request_id;
-
-    IF v_group_id IS NULL THEN
-        RAISE EXCEPTION 'Join request not found.' USING ERRCODE = 'P0002';
+    SELECT * INTO v_req FROM public.group_join_requests WHERE id = p_request_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Join request not found' USING ERRCODE = 'P0002';
     END IF;
 
-    -- Permission check: caller must be admin or owner
-    IF NOT private.is_group_admin(v_group_id) THEN
-        RAISE EXCEPTION 'Unauthorized: Only club admins can approve join requests.' USING ERRCODE = '42501';
+    IF NOT private.is_group_admin(v_req.group_id) THEN
+        RAISE EXCEPTION 'Unauthorized: Group admin privileges required' USING ERRCODE = '42501';
     END IF;
-
-    UPDATE public.group_join_requests
-    SET status = 'accepted', reviewed_at = NOW(), reviewed_by = auth.uid()
-    WHERE id = p_request_id;
 
     INSERT INTO public.group_members (group_id, user_id, role)
-    VALUES (v_group_id, v_applicant_id, 'member')
-    ON CONFLICT (group_id, user_id) DO UPDATE SET role = 'member';
+    VALUES (v_req.group_id, v_req.user_id, 'member')
+    ON CONFLICT (group_id, user_id) DO NOTHING;
+
+    UPDATE public.group_join_requests
+    SET status = 'approved', updated_at = NOW()
+    WHERE id = p_request_id;
 
     UPDATE public.groups
-    SET member_count = (SELECT COUNT(*) FROM public.group_members WHERE group_id = v_group_id)
-    WHERE id = v_group_id;
+    SET member_count = (SELECT COUNT(*) FROM public.group_members WHERE group_id = v_req.group_id)
+    WHERE id = v_req.group_id;
 
     RETURN TRUE;
 END;
 $$;
 
--- RPC: reject_group_join_request
-CREATE OR REPLACE FUNCTION public.reject_group_join_request(p_request_id UUID)
+-- RPC: decline_group_join_request
+CREATE OR REPLACE FUNCTION public.decline_group_join_request(p_request_id UUID)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth
 AS $$
 DECLARE
-    v_group_id UUID;
+    v_req RECORD;
 BEGIN
-    SELECT group_id INTO v_group_id
-    FROM public.group_join_requests
-    WHERE id = p_request_id;
-
-    IF v_group_id IS NULL THEN
-        RAISE EXCEPTION 'Join request not found.' USING ERRCODE = 'P0002';
+    SELECT * INTO v_req FROM public.group_join_requests WHERE id = p_request_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Join request not found' USING ERRCODE = 'P0002';
     END IF;
 
-    IF NOT private.is_group_admin(v_group_id) THEN
-        RAISE EXCEPTION 'Unauthorized: Only club admins can reject join requests.' USING ERRCODE = '42501';
+    IF NOT private.is_group_admin(v_req.group_id) THEN
+        RAISE EXCEPTION 'Unauthorized: Group admin privileges required' USING ERRCODE = '42501';
     END IF;
 
     UPDATE public.group_join_requests
-    SET status = 'rejected', reviewed_at = NOW(), reviewed_by = auth.uid()
+    SET status = 'declined', updated_at = NOW()
     WHERE id = p_request_id;
 
     RETURN TRUE;
@@ -489,7 +562,10 @@ END;
 $$;
 
 -- RPC: toggle_paper_vote
-CREATE OR REPLACE FUNCTION public.toggle_paper_vote(p_group_id UUID, p_bibcode TEXT)
+CREATE OR REPLACE FUNCTION public.toggle_paper_vote(
+    p_group_id UUID,
+    p_bibcode TEXT
+)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -497,39 +573,53 @@ SET search_path = pg_catalog, public, auth
 AS $$
 DECLARE
     v_user_id UUID := auth.uid();
+    v_group_paper_id UUID;
+    v_voted BOOLEAN;
 BEGIN
     IF v_user_id IS NULL THEN
-        RAISE EXCEPTION 'Authentication required.' USING ERRCODE = '42501';
+        RAISE EXCEPTION 'Authentication required' USING ERRCODE = '42501';
     END IF;
 
-    IF EXISTS (
+    SELECT id INTO v_group_paper_id
+    FROM public.group_papers
+    WHERE group_id = p_group_id AND bibcode = p_bibcode;
+
+    IF NOT FOUND THEN
+        INSERT INTO public.group_papers (group_id, bibcode, added_by, votes_count)
+        VALUES (p_group_id, p_bibcode, v_user_id, 0)
+        RETURNING id INTO v_group_paper_id;
+    END IF;
+
+    SELECT EXISTS (
         SELECT 1 FROM public.group_paper_votes
-        WHERE group_id = p_group_id AND bibcode = p_bibcode AND user_id = v_user_id
-    ) THEN
+        WHERE group_paper_id = v_group_paper_id AND user_id = v_user_id
+    ) INTO v_voted;
+
+    IF v_voted THEN
         DELETE FROM public.group_paper_votes
-        WHERE group_id = p_group_id AND bibcode = p_bibcode AND user_id = v_user_id;
+        WHERE group_paper_id = v_group_paper_id AND user_id = v_user_id;
 
         UPDATE public.group_papers
-        SET vote_count = (SELECT COUNT(*) FROM public.group_paper_votes WHERE group_id = p_group_id AND bibcode = p_bibcode)
-        WHERE group_id = p_group_id AND bibcode = p_bibcode;
+        SET votes_count = GREATEST(0, (SELECT COUNT(*) FROM public.group_paper_votes WHERE group_paper_id = v_group_paper_id))
+        WHERE id = v_group_paper_id;
 
         RETURN FALSE;
     ELSE
-        INSERT INTO public.group_paper_votes (group_id, bibcode, user_id)
-        VALUES (p_group_id, p_bibcode, v_user_id);
+        INSERT INTO public.group_paper_votes (group_paper_id, user_id)
+        VALUES (v_group_paper_id, v_user_id);
 
         UPDATE public.group_papers
-        SET vote_count = (SELECT COUNT(*) FROM public.group_paper_votes WHERE group_id = p_group_id AND bibcode = p_bibcode)
-        WHERE group_id = p_group_id AND bibcode = p_bibcode;
+        SET votes_count = (SELECT COUNT(*) FROM public.group_paper_votes WHERE group_paper_id = v_group_paper_id)
+        WHERE id = v_group_paper_id;
 
         RETURN TRUE;
     END IF;
 END;
 $$;
 
--- RPC: check_in_session
+-- RPC: check_in_session (Defined as RETURNS VOID to be 100% compatible with existing schemas)
 CREATE OR REPLACE FUNCTION public.check_in_session(p_presentation_id UUID)
-RETURNS BOOLEAN
+RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth
@@ -544,8 +634,6 @@ BEGIN
     INSERT INTO public.group_session_attendance (presentation_id, user_id)
     VALUES (p_presentation_id, v_user_id)
     ON CONFLICT (presentation_id, user_id) DO UPDATE SET checked_in_at = NOW();
-
-    RETURN TRUE;
 END;
 $$;
 
@@ -562,11 +650,11 @@ SET search_path = pg_catalog, public, auth
 AS $$
 BEGIN
     IF NOT private.is_group_admin(p_group_id) THEN
-        RAISE EXCEPTION 'Unauthorized: Only club admins can change roles' USING ERRCODE = '42501';
+        RAISE EXCEPTION 'Unauthorized: Only club admins or owners can change roles' USING ERRCODE = '42501';
     END IF;
 
-    IF p_new_role NOT IN ('admin', 'moderator', 'member') THEN
-        RAISE EXCEPTION 'Invalid role' USING ERRCODE = '22023';
+    IF p_new_role NOT IN ('owner', 'admin', 'moderator', 'member') THEN
+        RAISE EXCEPTION 'Invalid role specified: %', p_new_role USING ERRCODE = '22023';
     END IF;
 
     UPDATE public.group_members
@@ -577,7 +665,7 @@ BEGIN
 END;
 $$;
 
--- RPC: remove_group_member (kick member)
+-- RPC: remove_group_member
 CREATE OR REPLACE FUNCTION public.remove_group_member(
     p_group_id UUID,
     p_user_id UUID
@@ -588,8 +676,8 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public, auth
 AS $$
 BEGIN
-    IF NOT private.is_group_admin(p_group_id) THEN
-        RAISE EXCEPTION 'Unauthorized: Only club admins can remove members' USING ERRCODE = '42501';
+    IF NOT private.is_group_admin(p_group_id) AND auth.uid() != p_user_id THEN
+        RAISE EXCEPTION 'Unauthorized: Only club admins can remove other members' USING ERRCODE = '42501';
     END IF;
 
     DELETE FROM public.group_members
@@ -636,7 +724,6 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public, auth
 AS $$
 BEGIN
-    -- Only group owner can archive/dissolve
     IF NOT EXISTS (SELECT 1 FROM public.groups WHERE id = p_group_id AND owner_id = auth.uid()) THEN
         RAISE EXCEPTION 'Unauthorized: Only the club founder can archive this club' USING ERRCODE = '42501';
     END IF;
@@ -650,7 +737,7 @@ END;
 $$;
 
 -- ----------------------------------------------------------------------------
--- 15. Row Level Security (RLS) & Permissions
+-- 16. Row Level Security (RLS) & Policies
 -- ----------------------------------------------------------------------------
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -666,6 +753,147 @@ ALTER TABLE public.group_presentations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_session_rsvps ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_session_attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_session_reviews ENABLE ROW LEVEL SECURITY;
+
+-- Profiles: Authenticated users can read profiles; owners can insert/update/delete their own
+DROP POLICY IF EXISTS profiles_select_authenticated ON public.profiles;
+DROP POLICY IF EXISTS profiles_select_own ON public.profiles;
+DROP POLICY IF EXISTS profiles_select_policy ON public.profiles;
+CREATE POLICY profiles_select_authenticated ON public.profiles
+    FOR SELECT TO authenticated
+    USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS profiles_insert_own ON public.profiles;
+DROP POLICY IF EXISTS profiles_insert_policy ON public.profiles;
+CREATE POLICY profiles_insert_own ON public.profiles
+    FOR INSERT TO authenticated
+    WITH CHECK (auth.uid() = id);
+
+DROP POLICY IF EXISTS profiles_update_own ON public.profiles;
+DROP POLICY IF EXISTS profiles_update_policy ON public.profiles;
+CREATE POLICY profiles_update_own ON public.profiles
+    FOR UPDATE TO authenticated
+    USING (auth.uid() = id)
+    WITH CHECK (auth.uid() = id);
+
+DROP POLICY IF EXISTS profiles_delete_own ON public.profiles;
+DROP POLICY IF EXISTS profiles_delete_policy ON public.profiles;
+CREATE POLICY profiles_delete_own ON public.profiles
+    FOR DELETE TO authenticated
+    USING (auth.uid() = id);
+
+-- Keywords: Read by all, insert by authenticated
+DROP POLICY IF EXISTS keywords_read ON public.keywords;
+CREATE POLICY keywords_read ON public.keywords
+    FOR SELECT TO anon, authenticated
+    USING (TRUE);
+
+-- User Preferences: Private to owner
+DROP POLICY IF EXISTS user_preferences_all_own ON public.user_preferences;
+CREATE POLICY user_preferences_all_own ON public.user_preferences
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+-- Saved Papers: Private to owner
+DROP POLICY IF EXISTS saved_papers_all_own ON public.saved_papers;
+CREATE POLICY saved_papers_all_own ON public.saved_papers
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+-- Groups: Select visible groups, manage own
+DROP POLICY IF EXISTS groups_select_policy ON public.groups;
+CREATE POLICY groups_select_policy ON public.groups
+    FOR SELECT TO authenticated
+    USING (visibility = 'public' OR is_public = TRUE OR owner_id = auth.uid() OR public.is_group_member(id));
+
+DROP POLICY IF EXISTS groups_insert_policy ON public.groups;
+CREATE POLICY groups_insert_policy ON public.groups
+    FOR INSERT TO authenticated
+    WITH CHECK (auth.uid() = owner_id);
+
+DROP POLICY IF EXISTS groups_update_policy ON public.groups;
+CREATE POLICY groups_update_policy ON public.groups
+    FOR UPDATE TO authenticated
+    USING (auth.uid() = owner_id OR private.is_group_admin(id))
+    WITH CHECK (auth.uid() = owner_id OR private.is_group_admin(id));
+
+-- Group Members
+DROP POLICY IF EXISTS group_members_select_policy ON public.group_members;
+CREATE POLICY group_members_select_policy ON public.group_members
+    FOR SELECT TO authenticated
+    USING (public.can_read_group(group_id));
+
+DROP POLICY IF EXISTS group_members_insert_policy ON public.group_members;
+CREATE POLICY group_members_insert_policy ON public.group_members
+    FOR INSERT TO authenticated
+    WITH CHECK (auth.uid() = user_id OR private.is_group_admin(group_id));
+
+DROP POLICY IF EXISTS group_members_update_policy ON public.group_members;
+CREATE POLICY group_members_update_policy ON public.group_members
+    FOR UPDATE TO authenticated
+    USING (private.is_group_admin(group_id));
+
+DROP POLICY IF EXISTS group_members_delete_policy ON public.group_members;
+CREATE POLICY group_members_delete_policy ON public.group_members
+    FOR DELETE TO authenticated
+    USING (auth.uid() = user_id OR private.is_group_admin(group_id));
+
+-- Group Join Requests
+DROP POLICY IF EXISTS join_requests_select_policy ON public.group_join_requests;
+CREATE POLICY join_requests_select_policy ON public.group_join_requests
+    FOR SELECT TO authenticated
+    USING (auth.uid() = user_id OR private.is_group_admin(group_id));
+
+DROP POLICY IF EXISTS join_requests_insert_policy ON public.group_join_requests;
+CREATE POLICY join_requests_insert_policy ON public.group_join_requests
+    FOR INSERT TO authenticated
+    WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS join_requests_update_policy ON public.group_join_requests;
+CREATE POLICY join_requests_update_policy ON public.group_join_requests
+    FOR UPDATE TO authenticated
+    USING (private.is_group_admin(group_id));
+
+-- Group Papers, Votes, Sessions
+DROP POLICY IF EXISTS group_papers_select_policy ON public.group_papers;
+CREATE POLICY group_papers_select_policy ON public.group_papers
+    FOR SELECT TO authenticated
+    USING (public.can_read_group(group_id));
+
+DROP POLICY IF EXISTS group_papers_insert_policy ON public.group_papers;
+CREATE POLICY group_papers_insert_policy ON public.group_papers
+    FOR INSERT TO authenticated
+    WITH CHECK (public.is_group_member(group_id));
+
+DROP POLICY IF EXISTS group_paper_votes_all ON public.group_paper_votes;
+CREATE POLICY group_paper_votes_all ON public.group_paper_votes
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS presentations_select_policy ON public.group_presentations;
+CREATE POLICY presentations_select_policy ON public.group_presentations
+    FOR SELECT TO authenticated
+    USING (public.can_read_group(group_id));
+
+DROP POLICY IF EXISTS session_rsvps_all ON public.group_session_rsvps;
+CREATE POLICY session_rsvps_all ON public.group_session_rsvps
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS session_attendance_all ON public.group_session_attendance;
+CREATE POLICY session_attendance_all ON public.group_session_attendance
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS session_reviews_all ON public.group_session_reviews;
+CREATE POLICY session_reviews_all ON public.group_session_reviews
+    FOR ALL TO authenticated
+    USING (auth.uid() = reviewer_id OR private.is_group_admin(group_id))
+    WITH CHECK (auth.uid() = reviewer_id);
 
 -- Grants
 GRANT ALL ON TABLE public.profiles TO authenticated, service_role;

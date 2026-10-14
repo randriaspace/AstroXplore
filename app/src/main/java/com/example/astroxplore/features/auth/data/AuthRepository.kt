@@ -24,6 +24,19 @@ class AuthRepository @Inject constructor(
             this.email = email
             this.password = password
         }
+        val user = supabaseClient.auth.currentUserOrNull()
+        if (user != null) {
+            try {
+                val metadata = user.userMetadata
+                val metadataMap = metadata?.entries?.associate { it.key to it.value.jsonPrimitive.content }
+                val initialProfile = buildProfileFromUserData(
+                    userId = user.id,
+                    email = user.email ?: email,
+                    metadata = metadataMap ?: emptyMap()
+                )
+                supabaseClient.postgrest["profiles"].upsert(initialProfile)
+            } catch (_: Exception) {}
+        }
     }
 
     suspend fun requestPasswordReset(email: String) {

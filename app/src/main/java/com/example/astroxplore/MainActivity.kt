@@ -109,19 +109,12 @@ fun AstroXploreMain(
 ) {
     // Definitive readiness gate: wait until session is not Initializing,
     // or if 2-second timeout elapsed (offline launch), immediately unblock.
-    val isReady = isInitTimeout || (
-        sessionStatus !is SessionStatus.Initializing &&
-        (sessionStatus is SessionStatus.NotAuthenticated || (sessionStatus is SessionStatus.Authenticated && isOnboarded != null))
-    )
+    val isReady = isInitTimeout || sessionStatus !is SessionStatus.Initializing
 
     val startDestination = remember(isReady, sessionStatus, isOnboarded, isInitTimeout) {
         if (!isReady) null
         else when {
-            // When offline/timeout or user is onboarded, allow direct access to MainGraph / Library
-            sessionStatus is SessionStatus.Authenticated && isOnboarded == true -> Screen.MainGraph
-            sessionStatus is SessionStatus.Authenticated && isOnboarded == false -> Screen.OnboardingGraph
-            isInitTimeout && isOnboarded == true -> Screen.MainGraph
-            isInitTimeout -> Screen.MainGraph
+            sessionStatus is SessionStatus.Authenticated -> Screen.MainGraph
             sessionStatus is SessionStatus.NotAuthenticated -> Screen.AuthGraph
             else -> Screen.MainGraph
         }
