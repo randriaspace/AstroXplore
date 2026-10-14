@@ -230,7 +230,37 @@ class GroupRepository @Inject constructor(
                             )
                         )
                     }
-                } catch (_: Exception) {}
+                } catch (rpcEx: Exception) {
+                    // Fall back to direct table insert if RPC is missing on remote
+                    try {
+                        val groupPayload = mapOf(
+                            "name" to localGroup.name.trim(),
+                            "display_id" to localGroup.displayId,
+                            "description" to (localGroup.description ?: ""),
+                            "focus_area" to (localGroup.focusArea ?: ""),
+                            "owner_id" to userId,
+                            "visibility" to localGroup.visibility
+                        )
+                        val inserted = supabaseClient.postgrest["groups"]
+                            .insert(groupPayload) { select() }
+                            .decodeSingleOrNull<GroupModel>()
+                        if (inserted != null) {
+                            try {
+                                supabaseClient.postgrest["group_members"].insert(
+                                    mapOf("group_id" to inserted.id, "user_id" to userId, "role" to "admin")
+                                )
+                            } catch (_: Exception) {}
+                            groupDao.deleteGroup(localGroup.id)
+                            groupDao.insertGroup(
+                                inserted.toEntity(isSynced = true).copy(
+                                    isMember = true,
+                                    meetingSchedule = localGroup.meetingSchedule,
+                                    meetingLocation = localGroup.meetingLocation
+                                )
+                            )
+                        }
+                    } catch (_: Exception) {}
+                }
             }
         } catch (_: Exception) {}
 
@@ -419,7 +449,36 @@ class GroupRepository @Inject constructor(
                 return@withContext remote.copy(meetingSchedule = schedule, meetingLocation = location, isMember = true)
             }
         } catch (_: Exception) {
-            // Successfully created locally
+            // Direct table fallback if RPC is missing on remote Supabase instance
+            try {
+                val groupPayload = mapOf(
+                    "name" to name.trim(),
+                    "display_id" to displayId,
+                    "description" to (description ?: ""),
+                    "focus_area" to (focusArea ?: ""),
+                    "owner_id" to currentUserId,
+                    "visibility" to "public"
+                )
+                val inserted = supabaseClient.postgrest["groups"]
+                    .insert(groupPayload) { select() }
+                    .decodeSingleOrNull<GroupModel>()
+                if (inserted != null) {
+                    try {
+                        supabaseClient.postgrest["group_members"].insert(
+                            mapOf("group_id" to inserted.id, "user_id" to currentUserId, "role" to "admin")
+                        )
+                    } catch (_: Exception) {}
+                    groupDao.deleteGroup(localId)
+                    groupDao.insertGroup(inserted.toEntity(isSynced = true).copy(
+                        isMember = true,
+                        meetingSchedule = schedule,
+                        meetingLocation = location
+                    ))
+                    return@withContext inserted.copy(meetingSchedule = schedule, meetingLocation = location, isMember = true)
+                }
+            } catch (_: Exception) {
+                // Safely retained in Room DB with isSynced = false for subsequent queue drain
+            }
         }
 
         newGroup
@@ -548,6 +607,12 @@ class GroupRepository @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
+            // Direct table fallback if RPC is missing
+            try {
+                supabaseClient.postgrest["group_join_requests"].insert(
+                    mapOf("group_id" to groupId, "user_id" to currentUserId, "status" to "pending")
+                )
+            } catch (_: Exception) {}
             true
         }
     }
@@ -573,6 +638,15 @@ class GroupRepository @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
+            // Direct table fallback
+            try {
+                supabaseClient.postgrest["group_join_requests"].update(mapOf("status" to "accepted")) {
+                    filter { eq("id", requestId) }
+                }
+                supabaseClient.postgrest["group_members"].insert(
+                    mapOf("group_id" to groupId, "user_id" to applicantUserId, "role" to "member")
+                )
+            } catch (_: Exception) {}
             true
         }
     }
@@ -588,6 +662,12 @@ class GroupRepository @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
+            // Direct table fallback
+            try {
+                supabaseClient.postgrest["group_join_requests"].update(mapOf("status" to "rejected")) {
+                    filter { eq("id", requestId) }
+                }
+            } catch (_: Exception) {}
             true
         }
     }
