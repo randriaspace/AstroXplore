@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for polishing the Journal Clubs UI and creation flow: multi-step progressive creation wizard, curated space icons and color themes, enhanced club cards with meeting countdown badges, activity stats, and refined academic aesthetics.",
-  "updatedAt": "2026-10-14T11:27:56.307317482Z",
+  "summary": "Implementation plan for removing the feed setup banner, building a dedicated full-screen onboarding wizard on first launch, and polishing the UI/UX of the editing profile screen with avatar picker, bio, affiliation, and interest tags.",
+  "updatedAt": "2026-10-14T12:18:48.480358054Z",
   "requestFeedback": true,
   "userFacing": true
 }

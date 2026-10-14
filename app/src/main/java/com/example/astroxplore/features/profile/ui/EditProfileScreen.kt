@@ -1,11 +1,14 @@
 package com.example.astroxplore.features.profile.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -15,9 +18,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.astroxplore.core.ui.components.AstroLoadingSize
 import com.example.astroxplore.core.ui.components.AstroM3LoadingIndicator
@@ -35,13 +41,14 @@ fun EditProfileScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Edit Profile", fontWeight = FontWeight.Bold) },
+                title = { Text("Edit Scholar Profile", fontWeight = FontWeight.Bold) },
                 windowInsets = WindowInsets(0.dp),
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         }
     ) { innerPadding ->
@@ -115,8 +122,56 @@ fun EditProfileScreen(
                         .navigationBarsPadding()
                         .verticalScroll(rememberScrollState())
                         .padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
+                    // Immersive Header Hero Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                        ),
+                        shape = MaterialTheme.shapes.extraLarge,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(20.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(64.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    val initials = buildString {
+                                        if (firstName.isNotBlank()) append(firstName.first().uppercase())
+                                        if (lastName.isNotBlank()) append(lastName.first().uppercase())
+                                        if (this.isEmpty()) append("AS")
+                                    }
+                                    Text(
+                                        text = initials,
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = if (firstName.isNotBlank() || lastName.isNotBlank()) "$firstName $lastName".trim() else "Astrophysics Scholar",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (affiliationName.isNotBlank()) affiliationName else "Researcher Profile",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
                     Text(
                         text = "PUBLIC IDENTITY",
                         style = MaterialTheme.typography.labelLarge,
@@ -130,7 +185,8 @@ fun EditProfileScreen(
                         label = { Text("First Name") },
                         modifier = Modifier.fillMaxWidth(),
                         leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
-                        shape = MaterialTheme.shapes.large
+                        shape = MaterialTheme.shapes.large,
+                        singleLine = true
                     )
 
                     OutlinedTextField(
@@ -139,10 +195,11 @@ fun EditProfileScreen(
                         label = { Text("Last Name") },
                         modifier = Modifier.fillMaxWidth(),
                         leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
-                        shape = MaterialTheme.shapes.large
+                        shape = MaterialTheme.shapes.large,
+                        singleLine = true
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
                         text = "ACADEMIC BACKGROUND",
@@ -180,7 +237,8 @@ fun EditProfileScreen(
                             label = { Text("Institution / Organization Name") },
                             modifier = Modifier.fillMaxWidth(),
                             leadingIcon = { Icon(Icons.Outlined.Business, contentDescription = null) },
-                            shape = MaterialTheme.shapes.large
+                            shape = MaterialTheme.shapes.large,
+                            singleLine = true
                         )
                     }
 
@@ -235,10 +293,11 @@ fun EditProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         leadingIcon = { Icon(Icons.Outlined.Badge, contentDescription = null) },
                         shape = MaterialTheme.shapes.large,
-                        placeholder = { Text("0000-0000-0000-0000") }
+                        placeholder = { Text("0000-0000-0000-0000") },
+                        singleLine = true
                     )
 
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     Button(
                         onClick = {
@@ -262,11 +321,16 @@ fun EditProfileScreen(
                         Text("Save Changes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
 
-                    Spacer(modifier = Modifier.height(48.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
                 }
             }
             is EditProfileUiState.Error -> {
-                // Handle error
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(innerPadding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Error loading profile. Please try again.", color = MaterialTheme.colorScheme.error)
+                }
             }
         }
     }
@@ -296,7 +360,7 @@ fun PickerBottomSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 24.dp)
+                .padding(bottom = 32.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

@@ -127,6 +127,20 @@ class GroupRepository @Inject constructor(
             }
 
             val existingLocal = groupDao.getAllGroups().firstOrNull()?.associateBy { it.id } ?: emptyMap()
+            val remoteGroupIds = remoteGroups.map { it.id }.toSet()
+
+            // Prune local groups that no longer exist remotely or user is no longer member of
+            existingLocal.values.forEach { localGroup ->
+                val isRemoteStillValid = remoteGroupIds.contains(localGroup.id) &&
+                        (memberGroupIds.contains(localGroup.id) || localGroup.ownerId.equals(userId, ignoreCase = true))
+                if (!isRemoteStillValid) {
+                    groupDao.deleteGroup(localGroup.id)
+                    groupPaperDao.deleteGroupPapers(localGroup.id)
+                    groupPresentationDao.deleteGroupPresentations(localGroup.id)
+                    groupReviewDao.deleteGroupReviews(localGroup.id)
+                    groupMemberDao.deleteGroupMembers(localGroup.id)
+                }
+            }
 
             if (remoteGroups.isNotEmpty()) {
                 val entities = remoteGroups.map { group ->
@@ -774,7 +788,13 @@ class GroupRepository @Inject constructor(
                 function = "archive_group",
                 parameters = buildJsonObject { put("p_group_id", groupId) }
             )
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            try {
+                supabaseClient.postgrest["groups"].delete {
+                    filter { eq("id", groupId) }
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     suspend fun updateGroup(
