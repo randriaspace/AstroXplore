@@ -16,6 +16,7 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -49,9 +50,38 @@ class ProfileRepository @Inject constructor(
             
             if (remoteProfile != null) {
                 profileDao.insertProfile(remoteProfile.toEntity(isSynced = true))
+                remoteProfile
+            } else {
+                // Auto-provision profile if missing
+                val currentUser = supabaseClient.auth.currentUserOrNull()
+                val email = currentUser?.email ?: "user@example.com"
+                val metadata = currentUser?.userMetadata
+                val fullName = try {
+                    metadata?.get("full_name")?.jsonPrimitive?.content ?: email.substringBefore("@")
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    email.substringBefore("@")
+                }
+
+                val newProfile = ProfileModel(
+                    id = userId,
+                    email = email,
+                    fullName = fullName,
+                    institution = "Independent Researcher",
+                    isOnboarded = false
+                )
+                try {
+                    supabaseClient.postgrest["profiles"].upsert(newProfile)
+                    profileDao.insertProfile(newProfile.toEntity(isSynced = true))
+                    newProfile
+                } catch (upsertEx: Exception) {
+                    if (upsertEx is kotlinx.coroutines.CancellationException) throw upsertEx
+                    upsertEx.printStackTrace()
+                    profileDao.getProfileSync(userId)?.toDomainModel()
+                }
             }
-            remoteProfile
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             e.printStackTrace()
             profileDao.getProfileSync(userId)?.toDomainModel()
         }
@@ -69,8 +99,13 @@ class ProfileRepository @Inject constructor(
 
             if (remoteDto != null) {
                 return@withContext remoteDto
+            } else {
+                val profileModel = getProfile(userId)
+                val localTopics = keywordDao.getUserPreferences().firstOrNull()?.map { it.keyword } ?: emptyList()
+                return@withContext profileModel?.toDto(selectedTopics = localTopics)
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             e.printStackTrace()
         }
 

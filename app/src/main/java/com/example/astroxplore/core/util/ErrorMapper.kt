@@ -11,6 +11,9 @@ object ErrorMapper {
     private const val TAG = "ErrorMapper"
 
     fun mapToMessage(e: Throwable): Int {
+        if (e is kotlinx.coroutines.CancellationException) {
+            throw e
+        }
         // Log the technical error to IDE console for developers
         Log.e(TAG, "Technical Error Caught: ${e.message}", e)
 

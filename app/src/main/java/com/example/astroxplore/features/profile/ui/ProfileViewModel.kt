@@ -121,32 +121,35 @@ class ProfileViewModel @Inject constructor(
             selectedTopics = emptyList()
         )
         _userProfile.value = fallbackDto
+        _isLoading.value = true
 
         viewModelScope.launch {
-            _isLoading.value = true
-            
-            // Observe local profile changes
-            launch {
-                profileRepository.getLocalProfile(userId).collectLatest { localProfile ->
+            try {
+                val remoteDto = profileRepository.getUserProfileDto(userId)
+                if (remoteDto != null) {
+                    _userProfile.value = remoteDto
+                }
+                updateCacheSize()
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                e.printStackTrace()
+            } finally {
+                _isLoading.value = false
+            }
+        }
+
+        viewModelScope.launch {
+            try {
+                profileRepository.getLocalProfile(userId).collect { localProfile ->
                     if (localProfile != null) {
                         val topics = profileRepository.getLocalUserPreferences().firstOrNull() ?: emptyList()
                         _userProfile.value = localProfile.toDto(selectedTopics = topics)
                     }
                 }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                e.printStackTrace()
             }
-
-            // Sync from remote Supabase profile
-            launch {
-                val remoteDto = profileRepository.getUserProfileDto(userId)
-                if (remoteDto != null) {
-                    _userProfile.value = remoteDto
-                }
-            }
-
-            // Calculate cache size
-            updateCacheSize()
-
-            _isLoading.value = false
         }
     }
 
