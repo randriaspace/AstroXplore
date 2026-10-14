@@ -2,6 +2,7 @@ package com.example.astroxplore.features.groups.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -137,33 +138,28 @@ fun GroupHeroHeader(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                val theme = group?.let { AstroClubThemes.getThemeForGroup(it) } ?: AstroClubThemes.options[0]
+                val cleanFocus = AstroClubThemes.cleanFocusArea(group?.focusArea)
 
                 // Group Identity & Focus Area
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.Top
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(54.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.tertiary
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
+                    Surface(
+                        modifier = Modifier.size(54.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        color = theme.containerColor,
+                        border = BorderStroke(1.5.dp, theme.primaryColor.copy(alpha = 0.5f))
                     ) {
-                        Icon(
-                            Icons.Default.Groups,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                theme.icon,
+                                contentDescription = theme.iconName,
+                                tint = theme.primaryColor,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.width(14.dp))
@@ -186,13 +182,13 @@ fun GroupHeroHeader(
                             // Focus Area Badge
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                                color = theme.containerColor
                             ) {
                                 Text(
-                                    text = group?.focusArea ?: "Astrophysics Research",
+                                    text = cleanFocus,
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    color = theme.onContainerColor,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis

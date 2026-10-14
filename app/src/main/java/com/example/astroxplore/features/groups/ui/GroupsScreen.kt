@@ -1,8 +1,10 @@
 package com.example.astroxplore.features.groups.ui
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -12,6 +14,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
@@ -22,6 +26,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -34,6 +39,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.astroxplore.core.ui.components.AstroLoadingSize
 import com.example.astroxplore.core.ui.components.AstroM3LoadingIndicator
 import com.example.astroxplore.features.groups.model.GroupModel
+import com.example.astroxplore.features.groups.ui.components.AstroClubTheme
+import com.example.astroxplore.features.groups.ui.components.AstroClubThemes
 import com.example.astroxplore.features.groups.ui.components.QrCodeScannerSheet
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -87,13 +94,21 @@ fun GroupsScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.Lock,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.Lock,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             "Journal Clubs",
                             style = MaterialTheme.typography.titleLarge,
@@ -223,7 +238,8 @@ fun PrivateClubsHeaderBanner(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -234,16 +250,16 @@ fun PrivateClubsHeaderBanner(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
-                        shape = CircleShape,
+                        shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(42.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 Icons.Default.Groups,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
@@ -255,7 +271,7 @@ fun PrivateClubsHeaderBanner(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            "$clubCount active journal ${if (clubCount == 1) "club" else "clubs"}",
+                            "$clubCount active private ${if (clubCount == 1) "circle" else "circles"}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -268,7 +284,7 @@ fun PrivateClubsHeaderBanner(
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                         ),
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(38.dp)
                     ) {
                         Icon(
                             Icons.Default.QrCodeScanner,
@@ -279,12 +295,12 @@ fun PrivateClubsHeaderBanner(
                     FilledTonalButton(
                         onClick = onJoinClick,
                         shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.height(36.dp)
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.height(38.dp)
                     ) {
                         Icon(Icons.Outlined.GroupAdd, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Join", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Join", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -298,35 +314,77 @@ fun ClubCard(
     onClick: () -> Unit,
     onCopyCode: (String) -> Unit
 ) {
+    val theme = AstroClubThemes.getThemeForGroup(group)
+    val cleanFocus = AstroClubThemes.cleanFocusArea(group.focusArea)
+
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
         ),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, theme.primaryColor.copy(alpha = 0.28f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Header Row: Topic Badge + Club Code
+            // Header Row: Themed Avatar + Club Name + Focus + Code
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = group.focusArea?.ifBlank { "Astrophysics" } ?: "Astrophysics",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
+                    // Curated Theme Avatar
+                    Surface(
+                        shape = CircleShape,
+                        color = theme.containerColor,
+                        border = BorderStroke(1.5.dp, theme.primaryColor.copy(alpha = 0.4f)),
+                        modifier = Modifier.size(46.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                theme.icon,
+                                contentDescription = theme.iconName,
+                                tint = theme.primaryColor,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column {
+                        Text(
+                            text = group.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = theme.containerColor
+                            ) {
+                                Text(
+                                    text = cleanFocus,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = theme.onContainerColor,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
                 }
 
-                // Unique Club Code with copy affordance
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Unique Club Code Badge with Copy Action
                 Surface(
                     onClick = { onCopyCode(group.displayId) },
                     shape = RoundedCornerShape(8.dp),
@@ -340,14 +398,14 @@ fun ClubCard(
                         Icon(
                             Icons.Default.VpnKey,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(12.dp)
+                            tint = theme.primaryColor,
+                            modifier = Modifier.size(11.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = group.displayId,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = theme.primaryColor,
                             fontWeight = FontWeight.ExtraBold
                         )
                         Spacer(modifier = Modifier.width(4.dp))
@@ -355,22 +413,14 @@ fun ClubCard(
                             Icons.Default.ContentCopy,
                             contentDescription = "Copy Code",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(12.dp)
+                            modifier = Modifier.size(11.dp)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                text = group.name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-
             if (!group.description.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = group.description,
                     style = MaterialTheme.typography.bodySmall,
@@ -382,30 +432,39 @@ fun ClubCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Schedule with interactive styling
+            // Meeting Status & Cadence Highlight Pill
             if (group.meetingSchedule.isNotBlank()) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = theme.containerColor,
+                    border = BorderStroke(1.dp, theme.primaryColor.copy(alpha = 0.35f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(
-                        Icons.Default.CalendarToday,
-                        contentDescription = null,
-                        modifier = Modifier.size(15.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = group.meetingSchedule,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.CalendarToday,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = theme.primaryColor
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = group.meetingSchedule,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = theme.onContainerColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
-            // Location / Link
+            // Venue / Video Link
             if (group.meetingLocation.isNotBlank()) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -414,10 +473,10 @@ fun ClubCard(
                     Icon(
                         Icons.Outlined.LocationOn,
                         contentDescription = null,
-                        modifier = Modifier.size(15.dp),
-                        tint = MaterialTheme.colorScheme.secondary
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = group.meetingLocation,
                         style = MaterialTheme.typography.bodySmall,
@@ -432,7 +491,7 @@ fun ClubCard(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Footer
+            // Bottom Activity Stats & Open Action
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -440,13 +499,13 @@ fun ClubCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Default.People,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(15.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(4.dp))
@@ -461,7 +520,7 @@ fun ClubCard(
                         Icon(
                             Icons.AutoMirrored.Filled.MenuBook,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(15.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(4.dp))
@@ -471,12 +530,28 @@ fun ClubCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Lock,
+                            contentDescription = null,
+                            modifier = Modifier.size(13.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = "Private",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 FilledTonalButton(
                     onClick = onClick,
                     shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp)
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                    modifier = Modifier.height(34.dp)
                 ) {
                     Text("Open Club", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.width(4.dp))
@@ -530,7 +605,6 @@ fun EmptyClubsState(
         )
         Spacer(modifier = Modifier.height(28.dp))
 
-        // Actions
         Button(
             onClick = onCreateClick,
             modifier = Modifier
@@ -576,27 +650,36 @@ fun EmptyClubsState(
     }
 }
 
+/**
+ * Multi-Step Progressive Group Creation Wizard
+ * Step 0: Identity & Theme (Name, Description, Space Icon, Accent Palette, Focus Area)
+ * Step 1: Meeting Cadence & Schedule (Weekly multi-day or Monthly weekday/date + Time)
+ * Step 2: Venue & Review (Location link, full summary confirmation)
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateClubSheet(
     onDismiss: () -> Unit,
     onCreate: (name: String, desc: String?, focus: String?, schedule: String, loc: String) -> Unit
 ) {
+    var currentStep by remember { mutableIntStateOf(0) }
+
+    // Step 0: Identity & Theme State
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
+    var selectedTheme by remember { mutableStateOf(AstroClubThemes.options[0]) }
     var focusArea by remember { mutableStateOf("") }
-    var location by remember { mutableStateOf("Virtual Seminar Room") }
 
-    // Meeting Scheduler State (Weekly & Monthly)
+    val quickTopics = listOf("Exoplanets", "JWST Galaxies", "Gravitational Waves", "Black Holes", "Cosmology", "Fast Radio Bursts")
+
+    // Step 1: Meeting Scheduler State
     val frequencies = listOf("Weekly", "Monthly")
     var selectedFrequency by remember { mutableStateOf("Weekly") }
 
-    // Weekly parameters: 7 days of the week, multi-select
     val daysOfWeek = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
     var selectedDays by remember { mutableStateOf(setOf("Thu")) }
 
-    // Monthly parameters: By Weekday (e.g., 1st Thursday) or By Date (e.g., 15th)
-    var monthlyMode by remember { mutableStateOf("By Weekday") } // "By Weekday" or "By Date"
+    var monthlyMode by remember { mutableStateOf("By Weekday") }
     val weekOrdinals = listOf("1st", "2nd", "3rd", "4th", "Last")
     var selectedOrdinal by remember { mutableStateOf("1st") }
     var selectedMonthlyDay by remember { mutableStateOf("Thu") }
@@ -606,13 +689,12 @@ fun CreateClubSheet(
     var isCustomMonthlyDate by remember { mutableStateOf(false) }
     var customDayNumber by remember { mutableStateOf("1") }
 
-    // Meeting Time State
     val presetTimes = listOf("9:00 AM", "11:00 AM", "2:00 PM", "4:00 PM", "6:00 PM")
     var selectedTime by remember { mutableStateOf("4:00 PM") }
     var isCustomTime by remember { mutableStateOf(false) }
     var customTimeInput by remember { mutableStateOf("") }
 
-    // Dynamic schedule preview formulation
+    // Dynamic schedule preview
     val formattedSchedule = remember(
         selectedFrequency,
         selectedDays,
@@ -635,7 +717,6 @@ fun CreateClubSheet(
             }
             "Weekly on $daysStr at $timeStr"
         } else {
-            // Monthly
             if (monthlyMode == "By Weekday") {
                 "Monthly on the $selectedOrdinal $selectedMonthlyDay at $timeStr"
             } else {
@@ -657,13 +738,14 @@ fun CreateClubSheet(
         }
     }
 
-    val isScheduleValid = if (selectedFrequency == "Weekly") {
+    val isStep1Valid = if (selectedFrequency == "Weekly") {
         selectedDays.isNotEmpty()
     } else {
         true
     }
 
-    val quickTopics = listOf("Exoplanets", "JWST Galaxies", "Gravitational Waves", "Black Holes", "Cosmology", "Fast Radio Bursts")
+    // Step 2: Venue & Confirmation State
+    var location by remember { mutableStateOf("Virtual Seminar Room") }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -677,362 +759,591 @@ fun CreateClubSheet(
                 .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        "Start a Journal Club",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black
-                    )
-                    Text(
-                        "Private research group with scheduled consensus meetings",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Club Name *") },
-                placeholder = { Text("e.g. JWST High-Redshift Syndicate") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            // Focus topic chips
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    "Research Focus Area:",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(quickTopics) { topic ->
-                        FilterChip(
-                            selected = focusArea == topic,
-                            onClick = { focusArea = if (focusArea == topic) "" else topic },
-                            label = { Text(topic, fontSize = 12.sp) }
-                        )
-                    }
-                }
-                OutlinedTextField(
-                    value = focusArea,
-                    onValueChange = { focusArea = it },
-                    placeholder = { Text("Or specify custom focus (e.g. Magnetars)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            // -------------------------------------------------------------
-            // Advanced Meeting Scheduler Section
-            // -------------------------------------------------------------
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f)
-                ),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.AccessTime,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            "Meeting Cadence & Schedule",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    // 1. Frequency (Weekly or Monthly)
-                    Text(
-                        "Frequency:",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        frequencies.forEach { freq ->
-                            FilterChip(
-                                selected = selectedFrequency == freq,
-                                onClick = { selectedFrequency = freq },
-                                label = { Text(freq, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
-                            )
-                        }
-                    }
-
-                    // 2. Logic parameters based on frequency choice
-                    if (selectedFrequency == "Weekly") {
-                        // Weekly: Multi-select 7 days of the week
-                        Text(
-                            "Meeting Days (Select one or multiple):",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            daysOfWeek.forEach { day ->
-                                val isSelected = selectedDays.contains(day)
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = {
-                                        selectedDays = if (isSelected) {
-                                            if (selectedDays.size > 1) selectedDays - day else selectedDays
-                                        } else {
-                                            selectedDays + day
-                                        }
-                                    },
-                                    label = {
-                                        Text(
-                                            day,
-                                            fontSize = 11.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                    },
-                                    modifier = Modifier.height(34.dp)
-                                )
-                            }
-                        }
-                    } else {
-                        // Monthly: Choose logical recurrence parameters
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text(
-                                "Monthly Recurrence Pattern:",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                listOf("By Weekday", "By Date").forEach { mode ->
-                                    FilterChip(
-                                        selected = monthlyMode == mode,
-                                        onClick = { monthlyMode = mode },
-                                        label = { Text(mode, fontSize = 11.sp) }
-                                    )
-                                }
-                            }
-
-                            if (monthlyMode == "By Weekday") {
-                                // Week Ordinal (1st, 2nd, 3rd, 4th, Last)
-                                Text(
-                                    "Which Week of the Month:",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    items(weekOrdinals) { ord ->
-                                        FilterChip(
-                                            selected = selectedOrdinal == ord,
-                                            onClick = { selectedOrdinal = ord },
-                                            label = { Text(ord, fontSize = 11.sp) }
-                                        )
-                                    }
-                                }
-
-                                // Weekday of the Month (Mon, Tue, Wed, Thu, Fri, Sat, Sun)
-                                Text(
-                                    "Day of the Week:",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    daysOfWeek.forEach { day ->
-                                        FilterChip(
-                                            selected = selectedMonthlyDay == day,
-                                            onClick = { selectedMonthlyDay = day },
-                                            label = { Text(day, fontSize = 11.sp) },
-                                            modifier = Modifier.height(34.dp)
-                                        )
-                                    }
-                                }
-                            } else {
-                                // By Date of Month
-                                Text(
-                                    "Date of the Month:",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    items(monthlyPresetDates) { pDate ->
-                                        FilterChip(
-                                            selected = !isCustomMonthlyDate && selectedMonthlyDate == pDate,
-                                            onClick = {
-                                                isCustomMonthlyDate = false
-                                                selectedMonthlyDate = pDate
-                                            },
-                                            label = { Text(pDate, fontSize = 11.sp) }
-                                        )
-                                    }
-                                    item {
-                                        FilterChip(
-                                            selected = isCustomMonthlyDate,
-                                            onClick = { isCustomMonthlyDate = true },
-                                            label = { Text("Custom Day", fontSize = 11.sp) }
-                                        )
-                                    }
-                                }
-
-                                AnimatedVisibility(visible = isCustomMonthlyDate) {
-                                    OutlinedTextField(
-                                        value = customDayNumber,
-                                        onValueChange = { customDayNumber = it.filter { ch -> ch.isDigit() }.take(2) },
-                                        label = { Text("Day of Month (1 - 31)") },
-                                        placeholder = { Text("15") },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // 3. Meeting Time
-                    Text(
-                        "Meeting Time:",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(presetTimes) { time ->
-                            FilterChip(
-                                selected = !isCustomTime && selectedTime == time,
-                                onClick = {
-                                    isCustomTime = false
-                                    selectedTime = time
-                                },
-                                label = { Text(time, fontSize = 11.sp) }
-                            )
-                        }
-                        item {
-                            FilterChip(
-                                selected = isCustomTime,
-                                onClick = { isCustomTime = true },
-                                label = { Text("Custom", fontSize = 11.sp) }
-                            )
-                        }
-                    }
-
-                    AnimatedVisibility(visible = isCustomTime) {
-                        OutlinedTextField(
-                            value = customTimeInput,
-                            onValueChange = { customTimeInput = it },
-                            label = { Text("Custom Time (e.g. 3:30 PM UTC)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    // Live Formatted Schedule Preview Card
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.CalendarToday,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    "Formatted Schedule:",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                                )
-                                Text(
-                                    text = formattedSchedule,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            OutlinedTextField(
-                value = location,
-                onValueChange = { location = it },
-                label = { Text("Meeting Venue or Video Link") },
-                placeholder = { Text("e.g. Google Meet / Seminar Room 302") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text("Club Description") },
-                placeholder = { Text("Brief notes on topics, member responsibilities, or paper criteria...") },
-                minLines = 2,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            // Privacy guarantee notice
+            // Stepper Header Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    Icons.Default.Lock,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    "Private Club — Only accessible to peers with the unique Club Code or QR code.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = CircleShape,
+                        color = selectedTheme.containerColor,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                selectedTheme.icon,
+                                contentDescription = null,
+                                tint = selectedTheme.primaryColor,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = when (currentStep) {
+                                0 -> "Step 1 of 3: Identity & Theme"
+                                1 -> "Step 2 of 3: Meeting Cadence"
+                                else -> "Step 3 of 3: Venue & Review"
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = when (currentStep) {
+                                0 -> "Name, research focus, and visual theme"
+                                1 -> "Meeting recurrence and consensus schedule"
+                                else -> "Venue link and final confirmation"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
 
-            Button(
-                onClick = { onCreate(name, description, focusArea, formattedSchedule, location) },
-                enabled = name.isNotBlank() && isScheduleValid,
+            // Progressive step progress bar
+            LinearProgressIndicator(
+                progress = { (currentStep + 1) / 3f },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Create Journal Club", fontWeight = FontWeight.Bold)
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = selectedTheme.primaryColor,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+
+            // Animated Step Content
+            AnimatedContent(
+                targetState = currentStep,
+                transitionSpec = {
+                    if (targetState > initialState) {
+                        (slideInHorizontally(animationSpec = tween(220)) { width -> width } + fadeIn()).togetherWith(
+                            slideOutHorizontally(animationSpec = tween(220)) { width -> -width } + fadeOut()
+                        )
+                    } else {
+                        (slideInHorizontally(animationSpec = tween(220)) { width -> -width } + fadeIn()).togetherWith(
+                            slideOutHorizontally(animationSpec = tween(220)) { width -> width } + fadeOut()
+                        )
+                    }
+                },
+                label = "WizardStepTransition"
+            ) { step ->
+                when (step) {
+                    // -------------------------------------------------------------
+                    // STEP 0: Identity & Theme
+                    // -------------------------------------------------------------
+                    0 -> {
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            OutlinedTextField(
+                                value = name,
+                                onValueChange = { name = it },
+                                label = { Text("Journal Club Name *") },
+                                placeholder = { Text("e.g. JWST High-Redshift Syndicate") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Edit, contentDescription = null, tint = selectedTheme.primaryColor)
+                                },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            // Curated Theme & Icon Selection
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    "Visual Theme & Icon:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    items(AstroClubThemes.options) { themeOption ->
+                                        val isSelected = selectedTheme.id == themeOption.id
+                                        Surface(
+                                            onClick = { selectedTheme = themeOption },
+                                            shape = RoundedCornerShape(14.dp),
+                                            color = if (isSelected) themeOption.containerColor else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+                                            border = BorderStroke(
+                                                width = if (isSelected) 2.dp else 1.dp,
+                                                color = if (isSelected) themeOption.primaryColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                            ),
+                                            modifier = Modifier.width(130.dp)
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.padding(10.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally
+                                            ) {
+                                                Surface(
+                                                    shape = CircleShape,
+                                                    color = themeOption.containerColor,
+                                                    modifier = Modifier.size(36.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Icon(
+                                                            themeOption.icon,
+                                                            contentDescription = themeOption.iconName,
+                                                            tint = themeOption.primaryColor,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.height(6.dp))
+                                                Text(
+                                                    text = themeOption.name,
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                                                    color = if (isSelected) themeOption.primaryColor else MaterialTheme.colorScheme.onSurface,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    text = themeOption.iconName,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontSize = 10.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Research Focus Area
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    "Research Focus Area:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    items(quickTopics) { topic ->
+                                        FilterChip(
+                                            selected = focusArea == topic,
+                                            onClick = { focusArea = if (focusArea == topic) "" else topic },
+                                            label = { Text(topic, fontSize = 12.sp) }
+                                        )
+                                    }
+                                }
+                                OutlinedTextField(
+                                    value = focusArea,
+                                    onValueChange = { focusArea = it },
+                                    placeholder = { Text("Or custom focus (e.g. Magnetars & FRBs)") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+
+                            OutlinedTextField(
+                                value = description,
+                                onValueChange = { description = it },
+                                label = { Text("Club Description (Optional)") },
+                                placeholder = { Text("Overview of meeting topics, paper criteria, or presentation guidelines...") },
+                                minLines = 2,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Button(
+                                onClick = { currentStep = 1 },
+                                enabled = name.isNotBlank(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(50.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Continue to Schedule", fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+
+                    // -------------------------------------------------------------
+                    // STEP 1: Meeting Cadence & Schedule
+                    // -------------------------------------------------------------
+                    1 -> {
+                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
+                                ),
+                                shape = RoundedCornerShape(16.dp),
+                                border = BorderStroke(1.dp, selectedTheme.primaryColor.copy(alpha = 0.3f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    // 1. Frequency
+                                    Text(
+                                        "Meeting Frequency:",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        frequencies.forEach { freq ->
+                                            FilterChip(
+                                                selected = selectedFrequency == freq,
+                                                onClick = { selectedFrequency = freq },
+                                                label = { Text(freq, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                                            )
+                                        }
+                                    }
+
+                                    // 2. Logic parameters based on frequency
+                                    if (selectedFrequency == "Weekly") {
+                                        Text(
+                                            "Days of the Week (Multi-select):",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            daysOfWeek.forEach { day ->
+                                                val isSelected = selectedDays.contains(day)
+                                                FilterChip(
+                                                    selected = isSelected,
+                                                    onClick = {
+                                                        selectedDays = if (isSelected) {
+                                                            if (selectedDays.size > 1) selectedDays - day else selectedDays
+                                                        } else {
+                                                            selectedDays + day
+                                                        }
+                                                    },
+                                                    label = {
+                                                        Text(
+                                                            day,
+                                                            fontSize = 11.sp,
+                                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                        )
+                                                    },
+                                                    modifier = Modifier.height(34.dp)
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        // Monthly
+                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Text(
+                                                "Monthly Recurrence Pattern:",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                listOf("By Weekday", "By Date").forEach { mode ->
+                                                    FilterChip(
+                                                        selected = monthlyMode == mode,
+                                                        onClick = { monthlyMode = mode },
+                                                        label = { Text(mode, fontSize = 11.sp) }
+                                                    )
+                                                }
+                                            }
+
+                                            if (monthlyMode == "By Weekday") {
+                                                Text(
+                                                    "Week of the Month:",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                    items(weekOrdinals) { ord ->
+                                                        FilterChip(
+                                                            selected = selectedOrdinal == ord,
+                                                            onClick = { selectedOrdinal = ord },
+                                                            label = { Text(ord, fontSize = 11.sp) }
+                                                        )
+                                                    }
+                                                }
+
+                                                Text(
+                                                    "Day of the Week:",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    daysOfWeek.forEach { day ->
+                                                        FilterChip(
+                                                            selected = selectedMonthlyDay == day,
+                                                            onClick = { selectedMonthlyDay = day },
+                                                            label = { Text(day, fontSize = 11.sp) },
+                                                            modifier = Modifier.height(34.dp)
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                Text(
+                                                    "Day of Month Preset:",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                    items(monthlyPresetDates) { pDate ->
+                                                        FilterChip(
+                                                            selected = !isCustomMonthlyDate && selectedMonthlyDate == pDate,
+                                                            onClick = {
+                                                                isCustomMonthlyDate = false
+                                                                selectedMonthlyDate = pDate
+                                                            },
+                                                            label = { Text(pDate, fontSize = 11.sp) }
+                                                        )
+                                                    }
+                                                    item {
+                                                        FilterChip(
+                                                            selected = isCustomMonthlyDate,
+                                                            onClick = { isCustomMonthlyDate = true },
+                                                            label = { Text("Custom Day", fontSize = 11.sp) }
+                                                        )
+                                                    }
+                                                }
+
+                                                AnimatedVisibility(visible = isCustomMonthlyDate) {
+                                                    OutlinedTextField(
+                                                        value = customDayNumber,
+                                                        onValueChange = { customDayNumber = it.filter { ch -> ch.isDigit() }.take(2) },
+                                                        label = { Text("Calendar Day (1 - 31)") },
+                                                        singleLine = true,
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 3. Meeting Time
+                                    Text(
+                                        "Meeting Time:",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        items(presetTimes) { time ->
+                                            FilterChip(
+                                                selected = !isCustomTime && selectedTime == time,
+                                                onClick = {
+                                                    isCustomTime = false
+                                                    selectedTime = time
+                                                },
+                                                label = { Text(time, fontSize = 11.sp) }
+                                            )
+                                        }
+                                        item {
+                                            FilterChip(
+                                                selected = isCustomTime,
+                                                onClick = { isCustomTime = true },
+                                                label = { Text("Custom", fontSize = 11.sp) }
+                                            )
+                                        }
+                                    }
+
+                                    AnimatedVisibility(visible = isCustomTime) {
+                                        OutlinedTextField(
+                                            value = customTimeInput,
+                                            onValueChange = { customTimeInput = it },
+                                            label = { Text("Custom Meeting Time (e.g. 3:30 PM UTC)") },
+                                            singleLine = true,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
+
+                                    // Live Cadence Preview Card
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = selectedTheme.containerColor,
+                                        border = BorderStroke(1.dp, selectedTheme.primaryColor.copy(alpha = 0.35f))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                Icons.Default.CalendarToday,
+                                                contentDescription = null,
+                                                tint = selectedTheme.primaryColor,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text(
+                                                    "Formatted Schedule Preview:",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = selectedTheme.onContainerColor.copy(alpha = 0.7f)
+                                                )
+                                                Text(
+                                                    text = formattedSchedule,
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = selectedTheme.onContainerColor
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { currentStep = 0 },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(50.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Back")
+                                }
+
+                                Button(
+                                    onClick = { currentStep = 2 },
+                                    enabled = isStep1Valid,
+                                    modifier = Modifier
+                                        .weight(1.3f)
+                                        .height(50.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("Continue to Venue", fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    // -------------------------------------------------------------
+                    // STEP 2: Venue & Final Confirmation
+                    // -------------------------------------------------------------
+                    2 -> {
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            OutlinedTextField(
+                                value = location,
+                                onValueChange = { location = it },
+                                label = { Text("Meeting Venue or Video Link") },
+                                placeholder = { Text("e.g. Google Meet / Seminar Room 302") },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.LocationOn, contentDescription = null, tint = selectedTheme.primaryColor)
+                                },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            // Comprehensive Summary Review Card
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = selectedTheme.containerColor.copy(alpha = 0.45f)
+                                ),
+                                shape = RoundedCornerShape(18.dp),
+                                border = BorderStroke(1.5.dp, selectedTheme.primaryColor.copy(alpha = 0.4f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Text(
+                                        "Club Summary Review",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = selectedTheme.primaryColor
+                                    )
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = selectedTheme.containerColor,
+                                            border = BorderStroke(1.5.dp, selectedTheme.primaryColor),
+                                            modifier = Modifier.size(44.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    selectedTheme.icon,
+                                                    contentDescription = null,
+                                                    tint = selectedTheme.primaryColor,
+                                                    modifier = Modifier.size(24.dp)
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column {
+                                            Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                            Text(
+                                                text = if (focusArea.isNotBlank()) focusArea else "Astrophysics Discussion",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = selectedTheme.primaryColor,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+
+                                    HorizontalDivider(color = selectedTheme.primaryColor.copy(alpha = 0.2f))
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.CalendarToday, contentDescription = null, tint = selectedTheme.primaryColor, modifier = Modifier.size(15.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(formattedSchedule, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    }
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Outlined.LocationOn, contentDescription = null, tint = selectedTheme.primaryColor, modifier = Modifier.size(15.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(location.ifBlank { "Virtual Seminar Room" }, style = MaterialTheme.typography.bodySmall)
+                                    }
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(13.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Private Circle • Unique invite code will be generated", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { currentStep = 1 },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(52.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Back")
+                                }
+
+                                Button(
+                                    onClick = {
+                                        val taggedFocusArea = if (focusArea.isNotBlank()) {
+                                            "$focusArea [theme:${selectedTheme.id}]"
+                                        } else {
+                                            "Astrophysics [theme:${selectedTheme.id}]"
+                                        }
+                                        onCreate(name, description, taggedFocusArea, formattedSchedule, location)
+                                    },
+                                    enabled = name.isNotBlank() && isStep1Valid,
+                                    modifier = Modifier
+                                        .weight(1.5f)
+                                        .height(52.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("Create Journal Club", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))

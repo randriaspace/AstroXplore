@@ -1,56 +1,66 @@
-# Implementation Plan - Private Journal Clubs & Advanced Meeting Scheduler
+# Implementation Plan - Journal Clubs UI Polish & Progressive Creation Wizard
 
-Transform the Journal Clubs experience into a focused, private academic community platform by removing public club discovery and adding an interactive multi-day, multi-time, and frequency meeting scheduler for group creation.
+Transform the Journal Clubs experience with a polished multi-step creation wizard, curated astrophysics visual identities (icons and color themes), and enriched club cards featuring meeting countdowns, activity metrics, and sleek academic aesthetics.
 
-## User Requirements & Clarifications
-1. **Remove Public Clubs**: Remove the "Explore Public" tab and public discovery. Journal clubs are private to their members.
-2. **Unified Clubs Screen**: Replace the 2-tab layout with a single unified list of "My Clubs" featuring prominent "Start a Club" and "Join Club" actions.
-3. **Private Access**: Members join existing clubs exclusively via unique Club Code (e.g., `ASTRO8X2`) or QR code scanner.
-4. **Advanced Scheduling**: In the group creation sheet, provide interactive day chips (multi-select), meeting time selector/chips, and meeting frequency selection (Weekly, Bi-weekly, Monthly, Twice a week).
+---
+
+## User Preferences & Clarifications
+* **Creation Flow**: Multi-step sheet with clear progressive steps (Identity -> Schedule -> Venue & Review).
+* **Club Card Details**: Meeting countdown badge, accent theme colors, and activity stats (members, shelf papers, votes).
+* **Visual Identity**: Curated astrophysics icons (Telescope, Galaxy, Orbit, Satellite, Atom, Supernova) and color palettes.
 
 ---
 
 ## Proposed Changes
 
-### 1. Group Creation UI & Scheduling (`GroupsScreen.kt`)
-* Remove `PrimaryTabRow` ("My Clubs" / "Explore Public") in `GroupsScreen`.
-* Enhance `CreateGroupSheet`:
-  - **Meeting Frequency**: Segmented chips or dropdown for `Weekly`, `Bi-weekly`, `Monthly`, `Twice a week`.
-  - **Days of the Week**: Multi-select filter chips (`Mon`, `Tue`, `Wed`, `Thu`, `Fri`, `Sat`, `Sun`) allowing users to pick one or multiple days.
-  - **Meeting Time**: Preset time selector chips (`9:00 AM`, `11:00 AM`, `2:00 PM`, `4:00 PM`, `6:00 PM`) plus custom time input dialog.
-  - Automatically compose the combined schedule description (e.g., *"Weekly on Tue, Thu at 3:00 PM"*).
-  - Explicitly set `visibility = "private"` and `is_public = false` for all newly created groups.
-* Update top bar actions to include:
-  - "Scan QR Code" action button.
-  - "Join by Code" action button with modal dialog.
-  - Prominent Floating Action Button (FAB) / quick button for "Start a Club".
-* Redesign `EmptyClubsState` with informative onboarding for private research groups and quick action buttons to join or create.
+### 1. Multi-Step Group Creation Wizard (`GroupsScreen.kt`)
+* Refactor `CreateClubSheet` into a progressive 3-step wizard with a stepper indicator:
+  * **Step 1: Identity & Theme**:
+    - Club Name and optional description.
+    - Curated space icon selector (Telescope, Galaxy, Orbit, Satellite, Pulsar, Atom).
+    - Curated accent color palette selector (Nebula Purple, Deep Space Cyan, Supernova Amber, Cosmic Emerald, Solar Rose).
+    - Focus area quick chips (JWST Galaxies, Exoplanets, Gravitational Waves, etc.) and custom input.
+  * **Step 2: Meeting Cadence & Schedule**:
+    - Frequency selector: `Weekly` vs `Monthly`.
+    - Weekly: interactive 7-day multi-select chips (`Mon` to `Sun`).
+    - Monthly: Weekday ordinal (`1st`, `2nd`, `3rd`, `4th`, `Last`) + Day of week OR calendar date presets (`1st`, `15th`, `Last day`).
+    - Time selector (presets + custom input).
+    - Live formatted schedule preview card.
+  * **Step 3: Venue & Review**:
+    - Meeting venue or virtual link (e.g., Google Meet link or Seminar Hall).
+    - Summary card showing icon, theme, formatted cadence, venue, and private club code preview.
+  * **Navigation**: Step indicators (`1. Identity`, `2. Cadence`, `3. Venue`), "Back" and "Next / Create" buttons with smooth animated transitions.
 
-### 2. ViewModel & State Management (`GroupsViewModel.kt`)
-* Remove public clubs state (`exploreGroups`) to streamline UI reactivity to `myClubs`.
-* Update `uiState` to reflect joined/owned clubs: `GroupsUiState.Success(clubs: List<GroupModel>)`.
-* Update `createGroup` parameters to accept structured `frequency`, `days`, `times`, `location`, and generate human-readable schedule formatting.
-* Ensure joining via `displayId` (code) or QR scan works smoothly for private groups by matching the unique short code and enrolling the user as a member.
+### 2. Enhanced Journal Club Cards (`GroupsScreen.kt`)
+* Redesign `ClubCard`:
+  * **Themed Avatar**: Prominent icon container using the club's theme color and icon.
+  * **Meeting Status & Cadence Badge**: High-contrast pill badge highlighting the schedule (e.g. *"Every Thu at 4:00 PM"* or *"1st Friday"*).
+  * **Activity Stats Row**:
+    - Member count chip (`N members`).
+    - Paper shelf count chip (`N papers nominated`).
+    - Focus topic pill.
+  * **Copy Club Code Badge**: Monospace code tag with quick copy action and visual feedback.
+  * **Card Surface Polish**: Subtle accent container gradient/stroke conforming to Material Design 3 guidelines.
 
-### 3. Repository & Data Layer (`GroupRepository.kt`)
-* Update `createGroup` to save the formatted schedule, `visibility = "private"`, `is_public = false`, and enroll the creator as Admin.
-* Update `syncGroups` to focus on user-affiliated groups (where user is owner or member in `group_members`), ensuring synced clubs always appear in the user's club roster.
-* Ensure `joinGroupByDisplayId` looks up the private group by its unique code and upserts a membership row into `group_members`.
+### 3. Header & Empty State Polish (`GroupsScreen.kt`)
+* **Header Banner**: Display active research community stats, next upcoming session indicator, and quick "Join by Code" and "Scan QR" actions.
+* **Empty State**: Inviting academic illustration/icon with direct actions to start a club or enter a colleague's invite code.
 
 ---
 
 ## Verification Plan
 
 ### Compilation & Build Verification
-* Run `compile_applet` to confirm clean compilation with no syntax, import, or Compose state errors.
+* Run `compile_applet` to verify clean compilation with zero warnings or errors.
 
 ### Manual Verification Scenarios
-1. **Club Creation with Multi-Day/Time/Frequency**:
+1. **Multi-Step Creation Wizard**:
    - Open Journal Clubs -> tap "Start a Club".
-   - Select multiple days (e.g. Tuesday and Thursday), select meeting time (e.g. 3:00 PM), and select frequency ("Weekly").
-   - Confirm the created club displays *"Weekly on Tue, Thu at 3:00 PM"* in the club card.
-2. **Unified Private Club List**:
-   - Confirm the screen shows a single unified list with no "Explore Public" tab.
-   - Confirm empty state shows clear instructions on creating or joining with a code.
-3. **Join by Code & QR Code**:
-   - Open "Join Club" dialog, enter an existing club's `displayId`, and verify immediate enrollment and appearance in My Clubs.
+   - Step 1: Pick an icon (e.g. Telescope), accent color (e.g. Nebula Purple), and enter a club name.
+   - Step 2: Choose Weekly -> select Tue and Thu -> pick 4:00 PM. Verify live schedule preview.
+   - Step 3: Enter venue link -> verify summary card -> tap "Create Journal Club".
+2. **Club Card Visuals**:
+   - Verify newly created club renders with chosen icon, accent color, meeting badge, activity stats, and unique code.
+   - Tap "Copy Code" to verify clipboard copy and confirmation toast.
+3. **Monthly Cadence Support**:
+   - Create a second club with Monthly frequency (e.g. 1st Friday) and verify the card badge correctly displays the cadence.
