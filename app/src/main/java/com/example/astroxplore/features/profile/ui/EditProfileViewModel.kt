@@ -146,7 +146,7 @@ class EditProfileViewModel @Inject constructor(
             educationLevel = educationLevel,
             institution = institution ?: affiliationName,
             orcidId = orcidId,
-            isOnboarded = true
+            isOnboarded = currentProfile.isOnboarded
         )
 
         _uiState.value = EditProfileUiState.Success(updatedProfile)

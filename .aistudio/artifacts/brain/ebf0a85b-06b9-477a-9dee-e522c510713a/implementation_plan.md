@@ -1,16 +1,8 @@
-# Implementation Plan - Onboarding & Profile Editing UI/UX Polish
+# Implementation Plan - Fix Group Creation & Supabase Sync
 
-## 1. Remove Feed Onboarding Banner
-- Remove the setup preference banner from the feed screen.
-- Ensure onboarding status (`isOnboarded`) is handled via settings/welcome wizard rather than polluting the main feed.
+## 1. Prioritize Supabase RPC & Proper Error Propagation
+- Update `createGroup` in `GroupRepository` to call `create_group` RPC first, then update meeting schedule/location.
+- Propagate exceptions on server failure instead of swallowing them, ensuring the user gets clear feedback if creation fails.
 
-## 2. Dedicated Full-Screen Onboarding Wizard
-- Create a dedicated, polished full-screen Onboarding Activity / Composable flow for first-time launch.
-- Cover research preferences, key interests (Exoplanets, JWST, Cosmology, etc.), and affiliation setup.
-
-## 3. Polished Edit Profile Screen UI/UX
-- Redesign the Edit Profile screen with Material 3 immersive design:
-  - Curated avatar selector & hero banner preview.
-  - Enhanced research bio, institution affiliation, and academic title fields.
-  - Interactive research interest chips/tags.
-  - Clean floating action / save controls with smooth state transitions.
+## 2. Protect Unsynced Local Groups during Sync
+- Update `syncGroups` to check `isSynced` flag (`isLocallyCreatedUnsynced`), preventing locally created groups from being prematurely pruned before network push.

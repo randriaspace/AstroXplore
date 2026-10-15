@@ -440,6 +440,7 @@ fun BottomNavigationBar(
                         val tabOptions: NavOptionsBuilder.() -> Unit = {
                             popUpTo(navController.graph.findStartDestination().id) {
                                 saveState = true
+                                inclusive = false
                             }
                             launchSingleTop = true
                             restoreState = true

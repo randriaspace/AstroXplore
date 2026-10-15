@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for removing the feed setup banner, building a dedicated full-screen onboarding wizard on first launch, and polishing the UI/UX of the editing profile screen with avatar picker, bio, affiliation, and interest tags.",
-  "updatedAt": "2026-10-14T12:18:48.480358054Z",
+  "summary": "Implementation plan to fix group creation by prioritizing Supabase RPC create_group, propagating creation errors correctly instead of silent failure, and protecting local unsynced groups from being pruned during sync.",
+  "updatedAt": "2026-10-15T05:24:37.547532309Z",
   "requestFeedback": true,
   "userFacing": true
 }
