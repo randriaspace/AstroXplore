@@ -1,7 +1,31 @@
 package com.example.astroxplore.features.groups.model
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+
+object NullableStringAsEmptySerializer : KSerializer<String> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("NullableStringAsEmpty", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): String {
+        return if (decoder.decodeNotNullMark()) {
+            decoder.decodeString()
+        } else {
+            decoder.decodeNull()
+            ""
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: String) {
+        encoder.encodeString(value)
+    }
+}
 
 @Serializable
 data class GroupModel(
@@ -14,10 +38,44 @@ data class GroupModel(
     @SerialName("member_count") val memberCount: Int = 1,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("visibility") val visibility: String = "private", // "public" or "private"
+    @Serializable(with = NullableStringAsEmptySerializer::class)
     @SerialName("meeting_schedule") val meetingSchedule: String = "",
+    @Serializable(with = NullableStringAsEmptySerializer::class)
     @SerialName("meeting_location") val meetingLocation: String = "",
     @kotlinx.serialization.Transient val isMember: Boolean = false
 )
+
+@Serializable
+data class CreateGroupPayload(
+    @SerialName("name") val name: String,
+    @SerialName("display_id") val displayId: String,
+    @SerialName("description") val description: String? = null,
+    @SerialName("focus_area") val focusArea: String? = null,
+    @SerialName("owner_id") val ownerId: String,
+    @SerialName("visibility") val visibility: String = "private",
+    @SerialName("status") val status: String = "active",
+    @SerialName("is_public") val isPublic: Boolean = false,
+    @SerialName("member_count") val memberCount: Int = 1,
+    @SerialName("meeting_schedule") val meetingSchedule: String? = null,
+    @SerialName("meeting_location") val meetingLocation: String? = null
+)
+
+@Serializable
+data class GroupMemberInsertPayload(
+    @SerialName("group_id") val groupId: String,
+    @SerialName("user_id") val userId: String,
+    @SerialName("role") val role: String = "admin"
+)
+
+@Serializable
+data class UpdateGroupPayload(
+    @SerialName("name") val name: String,
+    @SerialName("description") val description: String? = null,
+    @SerialName("focus_area") val focusArea: String? = null,
+    @SerialName("meeting_schedule") val meetingSchedule: String? = null,
+    @SerialName("meeting_location") val meetingLocation: String? = null
+)
+
 
 @Serializable
 data class GroupPaperModel(

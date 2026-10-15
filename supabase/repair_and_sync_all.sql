@@ -730,6 +730,26 @@ BEGIN
 END;
 $$;
 
+-- RPC: dissolve_group
+CREATE OR REPLACE FUNCTION public.dissolve_group(p_group_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, auth
+AS $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM public.groups WHERE id = p_group_id AND owner_id = auth.uid()) THEN
+        RAISE EXCEPTION 'Unauthorized: Only the club founder can dissolve this club' USING ERRCODE = '42501';
+    END IF;
+
+    DELETE FROM public.groups
+    WHERE id = p_group_id;
+
+    RETURN TRUE;
+END;
+$$;
+
+
 -- ----------------------------------------------------------------------------
 -- 16. Row Level Security (RLS) & Policies
 -- ----------------------------------------------------------------------------
@@ -811,6 +831,12 @@ CREATE POLICY groups_update_policy ON public.groups
     FOR UPDATE TO authenticated
     USING (auth.uid() = owner_id OR private.is_group_admin(id))
     WITH CHECK (auth.uid() = owner_id OR private.is_group_admin(id));
+
+DROP POLICY IF EXISTS groups_delete_policy ON public.groups;
+CREATE POLICY groups_delete_policy ON public.groups
+    FOR DELETE TO authenticated
+    USING (auth.uid() = owner_id OR private.is_group_admin(id));
+
 
 -- Group Members
 DROP POLICY IF EXISTS group_members_select_policy ON public.group_members;

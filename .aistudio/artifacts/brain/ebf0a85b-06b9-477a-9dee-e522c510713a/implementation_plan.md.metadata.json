@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan to fix group creation by prioritizing Supabase RPC create_group, propagating creation errors correctly instead of silent failure, and protecting local unsynced groups from being pruned during sync.",
-  "updatedAt": "2026-10-15T05:24:37.547532309Z",
+  "summary": "Online-only Group CRUD implementation plan to eliminate offline sync conflicts and ensure journal clubs create, edit, dissolve, and sync reliably with Supabase.",
+  "updatedAt": "2026-10-15T09:33:01.292620628Z",
   "requestFeedback": true,
   "userFacing": true
 }

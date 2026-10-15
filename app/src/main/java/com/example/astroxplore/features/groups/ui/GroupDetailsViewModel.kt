@@ -307,18 +307,36 @@ class GroupDetailsViewModel @Inject constructor(
         }
     }
 
-    fun updateGroup(name: String, description: String?, focusArea: String?, schedule: String, location: String) {
-        val groupId = _currentGroup.value?.id ?: return
-        viewModelScope.launch {
-            groupRepository.updateGroup(groupId, name, description, focusArea, schedule, location)
-            _messages.emit("Club settings updated.")
-        }
-    }
-
-    fun archiveGroupWithPassword(password: String) {
+    fun updateGroup(
+        name: String,
+        description: String?,
+        focusArea: String?,
+        schedule: String,
+        location: String,
+        onSuccess: () -> Unit = {}
+    ) {
         val groupId = _currentGroup.value?.id ?: return
         viewModelScope.launch {
             try {
+                groupRepository.updateGroup(groupId, name, description, focusArea, schedule, location)
+                _messages.emit("Club settings updated.")
+                onSuccess()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _messages.emit(e.message ?: "Couldn't update club settings. Please check internet connection.")
+            }
+        }
+    }
+
+    fun archiveGroupWithPassword(password: String, onSuccess: () -> Unit = {}) {
+        val groupId = _currentGroup.value?.id ?: return
+        viewModelScope.launch {
+            try {
+                if (!groupRepository.isNetworkAvailable()) {
+                    _messages.emit("Internet connection required to dissolve club.")
+                    return@launch
+                }
                 // If using online auth, reauthenticate; if local, allow password
                 if (authRepository.isLoggedIn()) {
                     val reauthenticated = authRepository.reauthenticateCurrentUser(password)
@@ -327,21 +345,29 @@ class GroupDetailsViewModel @Inject constructor(
                         return@launch
                     }
                 }
-                groupRepository.archiveGroup(groupId)
-                _messages.emit("Journal Club archived successfully.")
+                groupRepository.dissolveGroup(groupId)
+                _messages.emit("Journal Club dissolved successfully.")
+                onSuccess()
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
-                _messages.emit("Couldn't archive the club. Please try again.")
+            } catch (e: Exception) {
+                _messages.emit(e.message ?: "Couldn't dissolve the club. Please check internet connection.")
             }
         }
     }
 
-    fun leaveGroup() {
+    fun leaveGroup(onSuccess: () -> Unit = {}) {
         val groupId = _currentGroup.value?.id ?: return
         viewModelScope.launch {
-            groupRepository.leaveGroup(groupId)
-            _messages.emit("You left the Journal Club.")
+            try {
+                groupRepository.leaveGroup(groupId)
+                _messages.emit("You left the Journal Club.")
+                onSuccess()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _messages.emit(e.message ?: "Couldn't leave club. Please check internet connection.")
+            }
         }
     }
 }

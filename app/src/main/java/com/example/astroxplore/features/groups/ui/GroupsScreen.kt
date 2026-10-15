@@ -205,10 +205,12 @@ fun GroupsScreen(
 
     if (showCreateSheet) {
         CreateClubSheet(
+            isOnline = isOnline,
             onDismiss = { showCreateSheet = false },
             onCreate = { name, desc, focus, sched, loc ->
-                viewModel.createGroup(name, desc, focus, sched, loc)
-                showCreateSheet = false
+                viewModel.createGroup(name, desc, focus, sched, loc) {
+                    showCreateSheet = false
+                }
             }
         )
     }
@@ -659,6 +661,7 @@ fun EmptyClubsState(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateClubSheet(
+    isOnline: Boolean = true,
     onDismiss: () -> Unit,
     onCreate: (name: String, desc: String?, focus: String?, schedule: String, loc: String) -> Unit
 ) {
@@ -1358,6 +1361,32 @@ fun CreateClubSheet(
                                     Text("Back")
                                 }
 
+                                if (!isOnline) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 12.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.CloudOff,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.error
+                                            )
+                                            Text(
+                                                "You are currently offline. Group creation requires an active internet connection to synchronize with Supabase.",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onErrorContainer
+                                            )
+                                        }
+                                    }
+                                }
+
                                 Button(
                                     onClick = {
                                         val hex = String.format("#%06X", (0xFFFFFF and android.graphics.Color.rgb(
@@ -1373,14 +1402,17 @@ fun CreateClubSheet(
                                         }
                                         onCreate(name, description, taggedFocusArea, formattedSchedule, location)
                                     },
-                                    enabled = name.isNotBlank() && isStep1Valid,
+                                    enabled = name.isNotBlank() && isStep1Valid && isOnline,
                                     modifier = Modifier
                                         .weight(1.5f)
                                         .height(52.dp),
                                     shape = RoundedCornerShape(12.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = currentAccentColor)
                                 ) {
-                                    Text("Create Journal Club", fontWeight = FontWeight.Bold)
+                                    Text(
+                                        if (isOnline) "Create Journal Club" else "Offline (Online Required)",
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                         }

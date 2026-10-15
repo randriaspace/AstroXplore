@@ -225,8 +225,9 @@ fun GroupDetailsScreen(
                         onApproveJoinRequest = { reqId, userId -> viewModel.approveJoinRequest(reqId, userId) },
                         onDeclineJoinRequest = { reqId -> viewModel.declineJoinRequest(reqId) },
                         onLeave = {
-                            viewModel.leaveGroup()
-                            onNavigateBack()
+                            viewModel.leaveGroup {
+                                onNavigateBack()
+                            }
                         },
                         onDelete = { showDeleteDialog = true },
                         onKick = { targetUserId -> viewModel.kickMember(targetUserId) },
@@ -269,10 +270,12 @@ fun GroupDetailsScreen(
     if (showEditSheet && group != null) {
         EditGroupSheet(
             group = group!!,
+            isOnline = isOnline,
             onDismiss = { showEditSheet = false },
             onUpdate = { n, d, f, s, l ->
-                viewModel.updateGroup(n, d, f, s, l)
-                showEditSheet = false
+                viewModel.updateGroup(n, d, f, s, l) {
+                    showEditSheet = false
+                }
             }
         )
     }
@@ -309,7 +312,7 @@ fun GroupDetailsScreen(
             title = { Text("Dissolve Journal Club?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("This archives the journal club and removes it from active member listings. Enter confirmation password.")
+                    Text("This dissolves the journal club and removes it permanently from active member listings. Enter confirmation password.")
                     OutlinedTextField(
                         value = archivePassword,
                         onValueChange = { archivePassword = it },
@@ -323,10 +326,11 @@ fun GroupDetailsScreen(
                 Button(
                     onClick = {
                         if (archivePassword.isNotBlank()) {
-                            viewModel.archiveGroupWithPassword(archivePassword)
-                            archivePassword = ""
-                            showDeleteDialog = false
-                            onNavigateBack()
+                            viewModel.archiveGroupWithPassword(archivePassword) {
+                                archivePassword = ""
+                                showDeleteDialog = false
+                                onNavigateBack()
+                            }
                         }
                     },
                     enabled = archivePassword.isNotBlank(),
@@ -1486,6 +1490,7 @@ fun GroupInviteDialog(
 @Composable
 fun EditGroupSheet(
     group: GroupModel,
+    isOnline: Boolean = true,
     onDismiss: () -> Unit,
     onUpdate: (String, String, String, String, String) -> Unit
 ) {
@@ -1505,6 +1510,27 @@ fun EditGroupSheet(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text("Edit Club Details", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
+
+            if (!isOnline) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.CloudOff, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                        Text(
+                            "You are currently offline. Updating club details requires an active internet connection.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
+
             OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Club Name") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(value = focusArea, onValueChange = { focusArea = it }, label = { Text("Focus Area") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(value = schedule, onValueChange = { schedule = it }, label = { Text("Meeting Schedule") }, modifier = Modifier.fillMaxWidth())
@@ -1513,10 +1539,11 @@ fun EditGroupSheet(
 
             Button(
                 onClick = { onUpdate(name, description, focusArea, schedule, location) },
+                enabled = name.isNotBlank() && isOnline,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(14.dp)
             ) {
-                Text("Update Settings", fontWeight = FontWeight.Bold)
+                Text(if (isOnline) "Update Settings" else "Offline (Online Required)", fontWeight = FontWeight.Bold)
             }
             Spacer(modifier = Modifier.height(24.dp))
         }

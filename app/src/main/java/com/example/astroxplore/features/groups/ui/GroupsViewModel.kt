@@ -82,30 +82,40 @@ class GroupsViewModel @Inject constructor(
         description: String?,
         focusArea: String?,
         schedule: String = "Weekly on Thursdays",
-        location: String = ""
+        location: String = "",
+        onSuccess: () -> Unit = {}
     ) {
         viewModelScope.launch {
             try {
                 val created = groupRepository.createGroup(name, description, focusArea, schedule, location)
                 _messages.emit("Created \"${created.name}\" successfully!")
                 syncGroups()
+                onSuccess()
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
-                _messages.emit("Couldn't create the club. Saved locally.")
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _messages.emit(e.message ?: "Could not create club. Please check internet connection.")
             }
         }
     }
 
     fun joinGroup(displayId: String) {
         viewModelScope.launch {
-            val success = groupRepository.joinGroup(displayId)
-            _joinStatus.emit(success)
-            if (success) {
-                _messages.emit("Joined club successfully! Welcome aboard.")
-                syncGroups()
-            } else {
-                _messages.emit("Couldn't find club with this code. Please check the code or QR scanner.")
+            try {
+                val success = groupRepository.joinGroup(displayId)
+                _joinStatus.emit(success)
+                if (success) {
+                    _messages.emit("Joined club successfully! Welcome aboard.")
+                    syncGroups()
+                } else {
+                    _messages.emit("Couldn't find club with this code. Please check the code or QR scanner.")
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _joinStatus.emit(false)
+                _messages.emit(e.message ?: "Failed to join club. Please check internet connection.")
             }
         }
     }

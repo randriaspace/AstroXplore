@@ -26,6 +26,7 @@ import kotlinx.serialization.json.put
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import com.example.astroxplore.core.network.NetworkConnectivityObserver
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -37,8 +38,11 @@ class GroupRepository @Inject constructor(
     private val groupPresentationDao: GroupPresentationDao,
     private val groupReviewDao: GroupReviewDao,
     private val groupMemberDao: GroupMemberDao,
-    private val groupJoinRequestDao: GroupJoinRequestDao
+    private val groupJoinRequestDao: GroupJoinRequestDao,
+    private val networkConnectivityObserver: NetworkConnectivityObserver
 ) {
+    fun isNetworkAvailable(): Boolean = networkConnectivityObserver.isNetworkAvailable()
+
     companion object {
         fun normalizeJoinInput(raw: String): String {
             return raw
@@ -100,6 +104,10 @@ class GroupRepository @Inject constructor(
         }
 
     suspend fun syncGroups() = withContext(Dispatchers.IO) {
+        if (!networkConnectivityObserver.isNetworkAvailable()) {
+            return@withContext // Offline: preserve local Room cache in read-only mode
+        }
+
         val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return@withContext
         try {
             val memberships = try {
@@ -116,23 +124,31 @@ class GroupRepository @Inject constructor(
 
             val memberGroupIds = memberships.map { it.groupId }.toSet()
 
+            var remoteFetchFailed = false
             val remoteGroups = try {
                 supabaseClient.postgrest["groups"]
-                    .select(columns = Columns.ALL)
+                    .select(columns = Columns.ALL) {
+                        filter { neq("status", "archived") }
+                    }
                     .decodeList<GroupModel>()
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 e.printStackTrace()
+                remoteFetchFailed = true
                 emptyList()
+            }
+
+            // If remote groups could not be loaded due to network/server error, do not prune local data!
+            if (remoteFetchFailed) {
+                return@withContext
             }
 
             val existingLocal = groupDao.getAllGroups().firstOrNull()?.associateBy { it.id } ?: emptyMap()
             val remoteGroupIds = remoteGroups.map { it.id }.toSet()
 
-            // Prune local groups that no longer exist remotely or user is no longer member of
+            // Prune local groups that no longer exist remotely (e.g. dissolved or deleted online)
             existingLocal.values.forEach { localGroup ->
-                val isRemoteStillValid = remoteGroupIds.contains(localGroup.id) &&
-                        (memberGroupIds.contains(localGroup.id) || localGroup.ownerId.equals(userId, ignoreCase = true))
+                val isRemoteStillValid = remoteGroupIds.contains(localGroup.id)
                 if (!isRemoteStillValid) {
                     groupDao.deleteGroup(localGroup.id)
                     groupPaperDao.deleteGroupPapers(localGroup.id)
@@ -240,64 +256,12 @@ class GroupRepository @Inject constructor(
     suspend fun syncPendingMutations() = withContext(Dispatchers.IO) {
         val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return@withContext
         
-        // 1. Sync pending local groups
+        // 1. In online-only mode, clean up any unsynced legacy groups so they don't linger as ghosts
         try {
             val unsyncedGroups = groupDao.getUnsyncedGroups()
-            for (localGroup in unsyncedGroups) {
-                try {
-                    val rows = supabaseClient.postgrest.rpc(
-                        function = "create_group",
-                        parameters = buildJsonObject {
-                            put("p_name", localGroup.name.trim())
-                            put("p_description", localGroup.description?.let(::JsonPrimitive) ?: JsonNull)
-                            put("p_focus_area", localGroup.focusArea?.let(::JsonPrimitive) ?: JsonNull)
-                            put("p_visibility", "public")
-                        }
-                    ).decodeList<GroupModel>()
-                    val remote = rows.singleOrNull()
-                    if (remote != null) {
-                        groupDao.deleteGroup(localGroup.id)
-                        groupDao.insertGroup(
-                            remote.toEntity(isSynced = true).copy(
-                                isMember = true,
-                                meetingSchedule = localGroup.meetingSchedule,
-                                meetingLocation = localGroup.meetingLocation
-                            )
-                        )
-                    }
-                } catch (rpcEx: Exception) {
-                    // Fall back to direct table insert if RPC is missing on remote
-                    try {
-                        val groupPayload = mapOf(
-                            "name" to localGroup.name.trim(),
-                            "display_id" to localGroup.displayId,
-                            "description" to (localGroup.description ?: ""),
-                            "focus_area" to (localGroup.focusArea ?: ""),
-                            "owner_id" to userId,
-                            "visibility" to localGroup.visibility,
-                            "status" to "active",
-                            "is_public" to true,
-                            "member_count" to 1
-                        )
-                        val inserted = supabaseClient.postgrest["groups"]
-                            .insert(groupPayload) { select() }
-                            .decodeSingleOrNull<GroupModel>()
-                        if (inserted != null) {
-                            try {
-                                supabaseClient.postgrest["group_members"].insert(
-                                    mapOf("group_id" to inserted.id, "user_id" to userId, "role" to "admin")
-                                )
-                            } catch (_: Exception) {}
-                            groupDao.deleteGroup(localGroup.id)
-                            groupDao.insertGroup(
-                                inserted.toEntity(isSynced = true).copy(
-                                    isMember = true,
-                                    meetingSchedule = localGroup.meetingSchedule,
-                                    meetingLocation = localGroup.meetingLocation
-                                )
-                            )
-                        }
-                    } catch (_: Exception) {}
+            if (unsyncedGroups.isNotEmpty()) {
+                for (localGroup in unsyncedGroups) {
+                    groupDao.deleteGroup(localGroup.id)
                 }
             }
         } catch (_: Exception) {}
@@ -435,110 +399,109 @@ class GroupRepository @Inject constructor(
         schedule: String = "",
         location: String = ""
     ): GroupModel = withContext(Dispatchers.IO) {
+        if (!networkConnectivityObserver.isNetworkAvailable()) {
+            throw IllegalStateException("Internet connection required to create a Journal Club.")
+        }
         val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
-            ?: throw IllegalStateException("Sign in to create a journal club.")
-        val localId = UUID.randomUUID().toString()
+            ?: throw IllegalStateException("Please sign in to create a Journal Club.")
+
         val displayId = "ASTRO" + UUID.randomUUID().toString().filter { it.isLetterOrDigit() }.take(5).uppercase()
         val createdAt = LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME)
 
-        val newGroup = GroupModel(
-            id = localId,
-            displayId = displayId,
+        val payload = CreateGroupPayload(
             name = name.trim(),
-            description = description?.trim(),
+            displayId = displayId,
+            description = description?.trim()?.ifBlank { null },
+            focusArea = focusArea?.trim()?.ifBlank { null },
             ownerId = currentUserId,
-            focusArea = focusArea?.trim(),
-            memberCount = 1,
-            createdAt = createdAt,
             visibility = "private",
-            meetingSchedule = schedule,
-            meetingLocation = location,
+            status = "active",
+            isPublic = false,
+            memberCount = 1,
+            meetingSchedule = schedule.trim().ifBlank { null },
+            meetingLocation = location.trim().ifBlank { null }
+        )
+
+        // Remote Supabase creation
+        val inserted: GroupModel = try {
+            supabaseClient.postgrest["groups"]
+                .insert(payload) { select() }
+                .decodeSingle<GroupModel>()
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            // Fall back to create_group RPC if direct insert fails
+            try {
+                val rpcRows = supabaseClient.postgrest.rpc(
+                    function = "create_group",
+                    parameters = buildJsonObject {
+                        put("p_name", name.trim())
+                        put("p_description", description?.trim()?.let(::JsonPrimitive) ?: JsonNull)
+                        put("p_focus_area", focusArea?.trim()?.let(::JsonPrimitive) ?: JsonNull)
+                        put("p_visibility", "private")
+                    }
+                ).decodeList<GroupModel>()
+                val remote = rpcRows.singleOrNull() ?: throw IllegalStateException("Server returned empty group response.")
+                if (schedule.isNotBlank() || location.isNotBlank()) {
+                    try {
+                        supabaseClient.postgrest["groups"].update(
+                            UpdateGroupPayload(
+                                name = name.trim(),
+                                description = description?.trim(),
+                                focusArea = focusArea?.trim(),
+                                meetingSchedule = schedule.trim().ifBlank { null },
+                                meetingLocation = location.trim().ifBlank { null }
+                            )
+                        ) { filter { eq("id", remote.id) } }
+                    } catch (_: Exception) {}
+                }
+                remote.copy(meetingSchedule = schedule, meetingLocation = location)
+            } catch (rpcEx: Exception) {
+                if (rpcEx is CancellationException) throw rpcEx
+                throw IllegalStateException("Failed to create club on server: ${e.message ?: rpcEx.message ?: "Unknown error"}")
+            }
+        }
+
+        // Add founder as admin member in Supabase
+        try {
+            supabaseClient.postgrest["group_members"].insert(
+                GroupMemberInsertPayload(
+                    groupId = inserted.id,
+                    userId = currentUserId,
+                    role = "admin"
+                )
+            )
+        } catch (_: Exception) {}
+
+        val finalized = inserted.copy(
+            meetingSchedule = schedule.ifBlank { inserted.meetingSchedule },
+            meetingLocation = location.ifBlank { inserted.meetingLocation },
             isMember = true
         )
 
-        // 1. Immediately store in Room database
-        groupDao.insertGroup(newGroup.toEntity(isSynced = false))
-        
-        // Add creator as Admin member
+        // Store confirmed server group in local Room cache with isSynced = true
+        groupDao.insertGroup(finalized.toEntity(isSynced = true))
+
         val ownerMember = GroupMemberModel(
             id = UUID.randomUUID().toString(),
-            groupId = localId,
+            groupId = finalized.id,
             userId = currentUserId,
             userName = "You (Founder)",
             role = "admin",
             joinedAt = createdAt
         )
-        groupMemberDao.insertMember(ownerMember.toEntity(isSynced = false))
+        groupMemberDao.insertMember(ownerMember.toEntity(isSynced = true))
 
-        // 2. Try remote Supabase in background
-        try {
-            val groupPayload = mapOf(
-                "name" to name.trim(),
-                "display_id" to displayId,
-                "description" to (description ?: ""),
-                "focus_area" to (focusArea ?: ""),
-                "owner_id" to currentUserId,
-                "visibility" to "private",
-                "status" to "active",
-                "is_public" to false,
-                "member_count" to 1,
-                "meeting_schedule" to schedule,
-                "meeting_location" to location
-            )
-            val inserted = supabaseClient.postgrest["groups"]
-                .insert(groupPayload) { select() }
-                .decodeSingleOrNull<GroupModel>()
-            if (inserted != null) {
-                try {
-                    supabaseClient.postgrest["group_members"].insert(
-                        mapOf("group_id" to inserted.id, "user_id" to currentUserId, "role" to "admin")
-                    )
-                } catch (_: Exception) {}
-                groupDao.deleteGroup(localId)
-                groupDao.insertGroup(inserted.toEntity(isSynced = true).copy(
-                    isMember = true,
-                    meetingSchedule = schedule,
-                    meetingLocation = location
-                ))
-                groupMemberDao.insertMember(
-                    ownerMember.copy(groupId = inserted.id).toEntity(isSynced = true)
-                )
-                return@withContext inserted.copy(meetingSchedule = schedule, meetingLocation = location, isMember = true)
-            }
-        } catch (_: Exception) {
-            // Fall back to RPC if direct table insert fails
-            try {
-                val rows = supabaseClient.postgrest.rpc(
-                    function = "create_group",
-                    parameters = buildJsonObject {
-                        put("p_name", name.trim())
-                        put("p_description", description?.let(::JsonPrimitive) ?: JsonNull)
-                        put("p_focus_area", focusArea?.let(::JsonPrimitive) ?: JsonNull)
-                        put("p_visibility", "private")
-                    }
-                ).decodeList<GroupModel>()
-                val remote = rows.singleOrNull()
-                if (remote != null) {
-                    try {
-                        supabaseClient.postgrest["groups"].update(
-                            mapOf("meeting_schedule" to schedule, "meeting_location" to location)
-                        ) { filter { eq("id", remote.id) } }
-                    } catch (_: Exception) {}
-                    groupDao.deleteGroup(localId)
-                    groupDao.insertGroup(remote.toEntity(isSynced = true).copy(isMember = true, meetingSchedule = schedule, meetingLocation = location))
-                    return@withContext remote.copy(meetingSchedule = schedule, meetingLocation = location, isMember = true)
-                }
-            } catch (_: Exception) {
-                // Safely retained in Room DB with isSynced = false for subsequent queue drain
-            }
-        }
-
-        newGroup
+        finalized
     }
 
     suspend fun joinGroup(inviteOrDisplayId: String): Boolean = withContext(Dispatchers.IO) {
+        if (!networkConnectivityObserver.isNetworkAvailable()) {
+            throw IllegalStateException("Internet connection required to join a club.")
+        }
+        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
+            ?: throw IllegalStateException("Please sign in to join a club.")
+
         val normalized = normalizeJoinInput(inviteOrDisplayId)
-        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: "local_user"
 
         // 1. Check local clubs first (matches displayId e.g. "ASTRO123", "JWST01", or ID)
         val allLocal = groupDao.getAllGroups().firstOrNull() ?: emptyList()
@@ -556,13 +519,17 @@ class GroupRepository @Inject constructor(
                 userId = currentUserId,
                 userName = "You",
                 role = "member",
-                joinedAt = LocalDateTime.now().toString()
+                joinedAt = LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME)
             )
             groupMemberDao.insertMember(member.toEntity(isSynced = true))
 
             try {
                 supabaseClient.postgrest["group_members"].insert(
-                    mapOf("group_id" to localMatch.id, "user_id" to currentUserId, "role" to "member")
+                    GroupMemberInsertPayload(
+                        groupId = localMatch.id,
+                        userId = currentUserId,
+                        role = "member"
+                    )
                 )
             } catch (_: Exception) {}
             return@withContext true
@@ -584,7 +551,11 @@ class GroupRepository @Inject constructor(
                 // Save membership to Supabase
                 try {
                     supabaseClient.postgrest["group_members"].insert(
-                        mapOf("group_id" to found.id, "user_id" to currentUserId, "role" to "member")
+                        GroupMemberInsertPayload(
+                            groupId = found.id,
+                            userId = currentUserId,
+                            role = "member"
+                        )
                     )
                 } catch (_: Exception) {}
 
@@ -596,7 +567,7 @@ class GroupRepository @Inject constructor(
                     userId = currentUserId,
                     userName = "You",
                     role = "member",
-                    joinedAt = LocalDateTime.now().toString()
+                    joinedAt = LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME)
                 )
                 groupMemberDao.insertMember(member.toEntity(isSynced = true))
 
@@ -764,38 +735,97 @@ class GroupRepository @Inject constructor(
     private suspend fun fetchGroupById(groupId: String): GroupModel =
         supabaseClient.postgrest["groups"]
             .select(columns = Columns.ALL) { filter { eq("id", groupId) } }
-            .decodeSingle()
+            .decodeSingle<GroupModel>()
 
     suspend fun leaveGroup(groupId: String) = withContext(Dispatchers.IO) {
-        groupDao.updateMembership(groupId, false)
+        if (!networkConnectivityObserver.isNetworkAvailable()) {
+            throw IllegalStateException("Internet connection required to leave club.")
+        }
+        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
+            ?: throw IllegalStateException("Please sign in to leave a club.")
+
         try {
             supabaseClient.postgrest.rpc<JsonElement>(
                 function = "leave_group",
                 parameters = buildJsonObject { put("p_group_id", groupId) }
             )
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+            try {
+                supabaseClient.postgrest["group_members"].delete {
+                    filter {
+                        eq("group_id", groupId)
+                        eq("user_id", currentUserId)
+                    }
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                throw IllegalStateException("Failed to leave club on server: ${e.message ?: "Unknown error"}")
+            }
+        }
+
+        groupDao.updateMembership(groupId, false)
+        groupMemberDao.removeMember(groupId, currentUserId)
     }
 
-    suspend fun archiveGroup(groupId: String) = withContext(Dispatchers.IO) {
+    suspend fun dissolveGroup(groupId: String) = withContext(Dispatchers.IO) {
+        if (!networkConnectivityObserver.isNetworkAvailable()) {
+            throw IllegalStateException("Internet connection required to dissolve club.")
+        }
+        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
+            ?: throw IllegalStateException("Please sign in to dissolve a club.")
+
+        var remoteDeleted = false
+        var lastError: Exception? = null
+
+        // 1. Try dissolve_group RPC
+        try {
+            supabaseClient.postgrest.rpc<JsonElement>(
+                function = "dissolve_group",
+                parameters = buildJsonObject { put("p_group_id", groupId) }
+            )
+            remoteDeleted = true
+        } catch (e: Exception) {
+            lastError = e
+        }
+
+        // 2. Direct delete with RLS groups_delete_policy
+        if (!remoteDeleted) {
+            try {
+                supabaseClient.postgrest["groups"].delete {
+                    filter { eq("id", groupId) }
+                }
+                remoteDeleted = true
+            } catch (e: Exception) {
+                lastError = e
+            }
+        }
+
+        // 3. Fallback to archive_group RPC
+        if (!remoteDeleted) {
+            try {
+                supabaseClient.postgrest.rpc<JsonElement>(
+                    function = "archive_group",
+                    parameters = buildJsonObject { put("p_group_id", groupId) }
+                )
+                remoteDeleted = true
+            } catch (e: Exception) {
+                lastError = e
+            }
+        }
+
+        if (!remoteDeleted) {
+            throw IllegalStateException("Failed to dissolve club on server: ${lastError?.message ?: "Check permissions or network"}")
+        }
+
+        // Clean up local cache once confirmed deleted remotely
         groupDao.deleteGroup(groupId)
         groupPaperDao.deleteGroupPapers(groupId)
         groupPresentationDao.deleteGroupPresentations(groupId)
         groupReviewDao.deleteGroupReviews(groupId)
         groupMemberDao.deleteGroupMembers(groupId)
-
-        try {
-            supabaseClient.postgrest.rpc<JsonElement>(
-                function = "archive_group",
-                parameters = buildJsonObject { put("p_group_id", groupId) }
-            )
-        } catch (e: Exception) {
-            try {
-                supabaseClient.postgrest["groups"].delete {
-                    filter { eq("id", groupId) }
-                }
-            } catch (_: Exception) {}
-        }
     }
+
+    suspend fun archiveGroup(groupId: String) = dissolveGroup(groupId)
 
     suspend fun updateGroup(
         groupId: String,
@@ -805,17 +835,30 @@ class GroupRepository @Inject constructor(
         schedule: String? = null,
         location: String? = null
     ) = withContext(Dispatchers.IO) {
-        groupDao.updateGroupDetails(groupId, name, description, focusArea, schedule, location)
+        if (!networkConnectivityObserver.isNetworkAvailable()) {
+            throw IllegalStateException("Internet connection required to update club settings.")
+        }
+        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
+            ?: throw IllegalStateException("Please sign in to update club settings.")
+
+        val payload = UpdateGroupPayload(
+            name = name.trim(),
+            description = description?.trim()?.ifBlank { null },
+            focusArea = focusArea?.trim()?.ifBlank { null },
+            meetingSchedule = schedule?.trim()?.ifBlank { null },
+            meetingLocation = location?.trim()?.ifBlank { null }
+        )
+
         try {
-            val update = mapOf(
-                "name" to name,
-                "description" to description,
-                "focus_area" to focusArea
-            )
-            supabaseClient.postgrest["groups"].update(update) {
+            supabaseClient.postgrest["groups"].update(payload) {
                 filter { eq("id", groupId) }
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            throw IllegalStateException("Failed to update club on server: ${e.message ?: "Unknown error"}")
+        }
+
+        groupDao.updateGroupDetails(groupId, name.trim(), description?.trim(), focusArea?.trim(), schedule?.trim(), location?.trim())
     }
 
     suspend fun addPaperToGroup(
