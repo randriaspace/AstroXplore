@@ -106,9 +106,10 @@ class LoginViewModel @Inject constructor(
                         profile = syncedProfile
                     }
 
-                    val isProfileOnboarded = profile.isOnboarded ||
-                            !profile.affiliationName.isNullOrBlank() ||
-                            !profile.affiliationType.isNullOrBlank()
+                    val isProfileOnboarded = profile.isOnboarded &&
+                            !profile.affiliationType.isNullOrBlank() &&
+                            !profile.country.isNullOrBlank() &&
+                            !profile.educationLevel.isNullOrBlank()
 
                     _uiState.value = LoginUiState.Success(isOnboarded = isProfileOnboarded)
                 } else {

@@ -1,12 +1,49 @@
-# Implementation Plan - Seamless Onboarding, Profile Roster & Keyword Preferences (Completed)
+# Implementation Plan - Bulletproof Onboarding & Polished Profile UI/UX
 
-Ensure users are never inappropriately forced into Onboarding if their profile already exists, fix the navigation flaw where updating keywords redirects away from the Profile screen to the Feed, and provide a real-time reactive keyword editor with full-screen tag selection.
+Fix the root cause where newly registered users with missing profile records or unpopulated professional fields (`affiliation_type`, `country`, `education_level` being NULL) bypass the Onboarding screen, and redesign both the Onboarding and Edit Profile screens with polished Material 3 multi-step cards, smooth progress animations, quick-pick dropdown sheets, and avatar headers.
 
-## Status: COMPLETED
+---
 
-All planned enhancements have been implemented and verified:
-1. **Profile Navigation Fix (`AppNavGraph.kt`)**: Updated `Screen.Interests` destination so `onPreferencesUpdated` calls `navController.popBackStack()`. When saving keywords, the user returns directly to the Profile screen instead of being booted to the Feed.
-2. **Onboarding Gate Logic (`MainViewModel.kt` & `LoginViewModel.kt`)**: Enhanced onboarding detection to check if the user already has profile details (affiliation, name, institution). If existing profile details or `isOnboarded` are present, onboarding is bypassed automatically and marked completed in `settingsRepository`.
-3. **Onboarding Skip Option (`OnboardingScreen.kt`)**: Added a prominent "Skip" button in the TopAppBar of the Onboarding screen so users are never trapped and can explore preprints immediately.
-4. **Reactive Profile Topic Updates (`ProfileViewModel.kt` & `ProfileScreen.kt`)**: Combined local profile Flow and user preferences Flow in `ProfileViewModel` so changes to keywords made in `InterestsScreen` immediately reflect on `ProfileScreen` with clean Material 3 chips.
-5. **Quality Verification**: Clean compilation confirmed with `compile_applet` and all unit tests passed with `gradle :app:testDebugUnitTest`.
+## 1. Root Cause Analysis: Why Onboarding Was Skipped
+
+1. **Database Default / Trigger Behavior**:
+   - In Supabase, when a new account registers, a trigger or default insert creates a `profiles` row with `is_onboarded = TRUE` (as seen in the user's Supabase screenshot), even though `affiliation_type`, `country`, and `education_level` are `NULL`.
+2. **Flawed `isOnboarded` Evaluation**:
+   - `MainViewModel.kt` and `LoginViewModel.kt` previously trusted `profile.isOnboarded == true` or checked if *any* local record existed. Since `is_onboarded` was true in the database row, the app evaluated the user as onboarded and booted them directly to the Feed, leaving professional details empty.
+3. **Solution**:
+   - A user is **truly onboarded** if and only if `profile.isOnboarded == true` **AND** their core professional details (`affiliationType`, `country`, `educationLevel`) are **non-blank/non-null**. If any of these required fields are missing, `isOnboarded` must evaluate to `false`, forcing the user into the Onboarding flow.
+
+---
+
+## 2. Planned Changes & Enhancements
+
+### A. Bulletproof Onboarding Gate (`MainViewModel.kt`, `LoginViewModel.kt`, `AuthRepository.kt`)
+- Update `isOnboarded` check in `MainViewModel` and `LoginViewModel` to strictly require:
+  `profile.isOnboarded == true && !profile.affiliationType.isNullOrBlank() && !profile.country.isNullOrBlank() && !profile.educationLevel.isNullOrBlank()`
+- Ensure newly built default profiles explicitly initialize `isOnboarded = false`.
+
+### B. Revamped Onboarding Screen UI/UX (`OnboardingScreen.kt`)
+- **Multi-Step Card Flow with Illustrations**:
+  - Step 1: Professional Background (Affiliation Type, Institution/Name, Country, Education Level) with clean M3 outlined text fields and quick-pick dropdown sheets.
+  - Step 2: Research Interests (Full-screen tag selector with search, live counter `3-6 topics selected`, and pinned selected chips).
+- **Smooth Progress & Polish**: Animated linear progress bar, subtle tonal elevation cards, 48dp+ touch targets, and a top-bar "Skip" button.
+
+### C. Revamped Edit Profile Screen UI/UX (`EditProfileScreen.kt`)
+- **Grouped Cards & Avatar Header**:
+  - Top hero profile card with dynamic scholar initials avatar, editable name, and affiliation summary.
+  - Grouped M3 section cards for Personal Information, Academic Affiliation, and Research Credentials (ORCID ID).
+  - Quick-pick bottom sheets for Affiliation Type, Country, and Education Level.
+  - Floating or bottom "Save Changes" action with ripple feedback and success feedback.
+
+---
+
+## 3. Verification Plan
+
+### Automated Build Verification
+- Run `compile_applet` to confirm zero compilation errors.
+- Run `gradle :app:testDebugUnitTest` to verify test suite health.
+
+### Manual Verification Scenarios
+1. **New Account Registration**: Create a fresh account or simulate a Supabase profile with `NULL` professional fields; verify the app immediately presents the Onboarding screen instead of bypassing it.
+2. **Onboarding Completion**: Fill in professional details and select 3–6 interests; verify smooth transition to the main app and correct database persistence (`is_onboarded = true`).
+3. **Edit Profile UI**: Navigate to Profile -> Edit Profile; verify the redesigned grouped card layout, avatar header, and interactive dropdown pickers work flawlessly.

@@ -84,10 +84,10 @@ class MainViewModel @Inject constructor(
                     // 1. Check local DataStore and local Room DB immediately
                     val isLocalDataStoreOnboarded = settingsRepository.onboardingComplete.first()
                     val localProfile = if (userId.isNotBlank()) profileRepository.getLocalProfile(userId).firstOrNull() else null
-                    val hasLocalProfileDetails = localProfile?.let {
-                        it.isOnboarded || !it.fullName.isNullOrBlank() || !it.affiliationName.isNullOrBlank() || !it.affiliationType.isNullOrBlank()
+                    val hasCompleteProfile = localProfile?.let {
+                        it.isOnboarded && !it.affiliationType.isNullOrBlank() && !it.country.isNullOrBlank() && !it.educationLevel.isNullOrBlank()
                     } == true
-                    val isLocallyOnboarded = isLocalDataStoreOnboarded || hasLocalProfileDetails
+                    val isLocallyOnboarded = isLocalDataStoreOnboarded && hasCompleteProfile
 
                     if (isLocallyOnboarded) {
                         _isOnboarded.value = true
@@ -104,7 +104,7 @@ class MainViewModel @Inject constructor(
                                     profileRepository.getProfile(userId)
                                 }
                                 remoteOnboarded = profile?.let {
-                                    it.isOnboarded || !it.fullName.isNullOrBlank() || !it.affiliationName.isNullOrBlank() || !it.affiliationType.isNullOrBlank()
+                                    it.isOnboarded && !it.affiliationType.isNullOrBlank() && !it.country.isNullOrBlank() && !it.educationLevel.isNullOrBlank()
                                 } == true
                             } catch (_: Exception) {
                             }

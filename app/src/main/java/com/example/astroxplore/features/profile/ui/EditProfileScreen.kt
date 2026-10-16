@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -172,130 +173,174 @@ fun EditProfileScreen(
                         }
                     }
 
-                    Text(
-                        text = "PUBLIC IDENTITY",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    OutlinedTextField(
-                        value = firstName,
-                        onValueChange = { firstName = it },
-                        label = { Text("First Name") },
+                    // Group 1: Public Identity
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
-                        shape = MaterialTheme.shapes.large,
-                        singleLine = true
-                    )
+                        shape = RoundedCornerShape(24.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                text = "PUBLIC IDENTITY",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
 
-                    OutlinedTextField(
-                        value = lastName,
-                        onValueChange = { lastName = it },
-                        label = { Text("Last Name") },
+                            OutlinedTextField(
+                                value = firstName,
+                                onValueChange = { firstName = it },
+                                label = { Text("First Name") },
+                                modifier = Modifier.fillMaxWidth(),
+                                leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
+                                shape = MaterialTheme.shapes.large,
+                                singleLine = true
+                            )
+
+                            OutlinedTextField(
+                                value = lastName,
+                                onValueChange = { lastName = it },
+                                label = { Text("Last Name") },
+                                modifier = Modifier.fillMaxWidth(),
+                                leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
+                                shape = MaterialTheme.shapes.large,
+                                singleLine = true
+                            )
+                        }
+                    }
+
+                    // Group 2: Academic Background
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
-                        shape = MaterialTheme.shapes.large,
-                        singleLine = true
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Text(
-                        text = "ACADEMIC BACKGROUND",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    // Affiliation Type Picker Field
-                    Box(modifier = Modifier.fillMaxWidth().clickable { showAffiliationPicker = true }) {
-                        OutlinedTextField(
-                            value = affiliationType,
-                            onValueChange = {},
-                            readOnly = true,
-                            enabled = false,
-                            label = { Text("Affiliation Type") },
-                            leadingIcon = { Icon(Icons.Outlined.Business, contentDescription = null) },
-                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.large,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        shape = RoundedCornerShape(24.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                text = "ACADEMIC BACKGROUND",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
                             )
-                        )
+
+                            // Affiliation Type Picker Field
+                            Box(modifier = Modifier.fillMaxWidth().clickable { showAffiliationPicker = true }) {
+                                OutlinedTextField(
+                                    value = affiliationType,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    enabled = false,
+                                    label = { Text("Affiliation Type") },
+                                    leadingIcon = { Icon(Icons.Outlined.Business, contentDescription = null) },
+                                    trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = MaterialTheme.shapes.large,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
+
+                            if (affiliationType != "Individual" && affiliationType.isNotEmpty()) {
+                                OutlinedTextField(
+                                    value = affiliationName,
+                                    onValueChange = { affiliationName = it },
+                                    label = { Text("Institution / Organization Name") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    leadingIcon = { Icon(Icons.Outlined.Business, contentDescription = null) },
+                                    shape = MaterialTheme.shapes.large,
+                                    singleLine = true
+                                )
+                            }
+
+                            // Country Picker Field
+                            Box(modifier = Modifier.fillMaxWidth().clickable { showCountryPicker = true }) {
+                                OutlinedTextField(
+                                    value = country,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    enabled = false,
+                                    label = { Text("Country") },
+                                    leadingIcon = { Icon(Icons.Outlined.Public, contentDescription = null) },
+                                    trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = MaterialTheme.shapes.large,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
+
+                            // Education Level Picker Field
+                            Box(modifier = Modifier.fillMaxWidth().clickable { showEducationPicker = true }) {
+                                OutlinedTextField(
+                                    value = educationLevel,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    enabled = false,
+                                    label = { Text("Education Level") },
+                                    leadingIcon = { Icon(Icons.Outlined.School, contentDescription = null) },
+                                    trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = MaterialTheme.shapes.large,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
+                        }
                     }
 
-                    if (affiliationType != "Individual" && affiliationType.isNotEmpty()) {
-                        OutlinedTextField(
-                            value = affiliationName,
-                            onValueChange = { affiliationName = it },
-                            label = { Text("Institution / Organization Name") },
-                            modifier = Modifier.fillMaxWidth(),
-                            leadingIcon = { Icon(Icons.Outlined.Business, contentDescription = null) },
-                            shape = MaterialTheme.shapes.large,
-                            singleLine = true
-                        )
-                    }
-
-                    // Country Picker Field
-                    Box(modifier = Modifier.fillMaxWidth().clickable { showCountryPicker = true }) {
-                        OutlinedTextField(
-                            value = country,
-                            onValueChange = {},
-                            readOnly = true,
-                            enabled = false,
-                            label = { Text("Country") },
-                            leadingIcon = { Icon(Icons.Outlined.Public, contentDescription = null) },
-                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.large,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        )
-                    }
-
-                    // Education Level Picker Field
-                    Box(modifier = Modifier.fillMaxWidth().clickable { showEducationPicker = true }) {
-                        OutlinedTextField(
-                            value = educationLevel,
-                            onValueChange = {},
-                            readOnly = true,
-                            enabled = false,
-                            label = { Text("Education Level") },
-                            leadingIcon = { Icon(Icons.Outlined.School, contentDescription = null) },
-                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.large,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        )
-                    }
-
-                    OutlinedTextField(
-                        value = orcidId,
-                        onValueChange = { orcidId = it },
-                        label = { Text("ORCID iD") },
+                    // Group 3: Research Credentials
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = { Icon(Icons.Outlined.Badge, contentDescription = null) },
-                        shape = MaterialTheme.shapes.large,
-                        placeholder = { Text("0000-0000-0000-0000") },
-                        singleLine = true
-                    )
+                        shape = RoundedCornerShape(24.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                text = "RESEARCH CREDENTIALS",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            OutlinedTextField(
+                                value = orcidId,
+                                onValueChange = { orcidId = it },
+                                label = { Text("ORCID iD") },
+                                modifier = Modifier.fillMaxWidth(),
+                                leadingIcon = { Icon(Icons.Outlined.Badge, contentDescription = null) },
+                                shape = MaterialTheme.shapes.large,
+                                placeholder = { Text("0000-0000-0000-0000") },
+                                singleLine = true
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
