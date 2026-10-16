@@ -60,6 +60,7 @@ fun GroupsScreen(
     var showQrScanner by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
 
     LaunchedEffect(Unit) {
@@ -126,7 +127,7 @@ fun GroupsScreen(
                         Icon(Icons.Outlined.GroupAdd, contentDescription = "Join Club by Code")
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent
                 )
             )

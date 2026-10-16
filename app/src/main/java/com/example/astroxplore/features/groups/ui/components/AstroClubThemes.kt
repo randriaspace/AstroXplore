@@ -1,6 +1,7 @@
 package com.example.astroxplore.features.groups.ui.components
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -24,7 +25,7 @@ object AstroClubThemes {
         "Galaxy" to Icons.Default.AutoAwesome,
         "Telescope" to Icons.Default.Explore,
         "Hub" to Icons.Default.Hub,
-        "Book" to Icons.Default.MenuBook,
+        "Book" to Icons.AutoMirrored.Filled.MenuBook,
         "Radar" to Icons.Default.Radar,
         "Flare" to Icons.Default.Flare,
         "Satellite" to Icons.Default.Satellite,

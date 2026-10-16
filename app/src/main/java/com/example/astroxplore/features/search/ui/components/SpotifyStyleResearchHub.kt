@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Refresh
@@ -186,7 +187,7 @@ fun SpotifyStyleResearchHub(
                 modifier = Modifier.padding(bottom = 12.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.TrendingUp,
+                    imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(22.dp)

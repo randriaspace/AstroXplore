@@ -13,11 +13,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Science
-import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -155,7 +155,7 @@ fun AiResearchBriefingCard(
                     ) {
                         val icon = when {
                             briefing.categoryBadge.contains("Club", ignoreCase = true) -> Icons.Outlined.Groups
-                            briefing.categoryBadge.contains("Citation", ignoreCase = true) -> Icons.Outlined.TrendingUp
+                            briefing.categoryBadge.contains("Citation", ignoreCase = true) -> Icons.AutoMirrored.Outlined.TrendingUp
                             else -> Icons.Outlined.Science
                         }
                         Icon(
