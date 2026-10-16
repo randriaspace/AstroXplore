@@ -136,16 +136,7 @@ fun AiResearchBriefingCard(
         )
     ) {
         Column(
-            modifier = Modifier
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                            Color.Transparent
-                        )
-                    )
-                )
-                .padding(20.dp)
+            modifier = Modifier.padding(20.dp)
         ) {
             // Badges row: Category + Context reason
             Row(

@@ -53,22 +53,14 @@ fun GroupHeroHeader(
         label = "pulseAlpha"
     )
 
-    val cosmicGradient = Brush.verticalGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.surfaceColorAtElevation(12.dp),
-            MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp),
-            MaterialTheme.colorScheme.surface
-        )
-    )
-
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = Color.Transparent
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(cosmicGradient)
                 .statusBarsPadding()
         ) {
             Column(
@@ -128,8 +120,8 @@ fun GroupHeroHeader(
                                     )
                             ) {
                                 Icon(
-                                    Icons.Default.Edit,
-                                    contentDescription = "Edit Club Settings",
+                                    Icons.Default.Settings,
+                                    contentDescription = "Club Settings & Administration",
                                     modifier = Modifier.size(20.dp),
                                     tint = MaterialTheme.colorScheme.onSurface
                                 )

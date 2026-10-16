@@ -262,13 +262,7 @@ fun SpotifyProfileKeywordPill(
         modifier = Modifier.expressiveBounce(onClick = onClick)
     ) {
         Row(
-            modifier = Modifier
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(primaryColor.copy(alpha = 0.18f), Color.Transparent)
-                    )
-                )
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -339,7 +333,6 @@ fun SpotifyResearchMixCard(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Brush.verticalGradient(gradientColors))
                 .padding(18.dp)
         ) {
             Column(
@@ -472,13 +465,7 @@ fun SpotifyTopicPill(
         modifier = Modifier.expressiveBounce(onClick = onClick)
     ) {
         Row(
-            modifier = Modifier
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(accent.copy(alpha = 0.12f), Color.Transparent)
-                    )
-                )
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(

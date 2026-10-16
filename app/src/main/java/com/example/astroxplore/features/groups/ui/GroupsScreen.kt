@@ -173,9 +173,7 @@ fun GroupsScreen(
                         ) {
                             item {
                                 PrivateClubsHeaderBanner(
-                                    clubCount = state.clubs.size,
-                                    onJoinClick = { showJoinDialog = true },
-                                    onScanQrClick = { showQrScanner = true }
+                                    clubCount = state.clubs.size
                                 )
                             }
 
@@ -232,79 +230,48 @@ fun GroupsScreen(
 
 @Composable
 fun PrivateClubsHeaderBanner(
-    clubCount: Int,
-    onJoinClick: () -> Unit,
-    onScanQrClick: () -> Unit
+    clubCount: Int
 ) {
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
         ),
         shape = RoundedCornerShape(18.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.size(42.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.size(42.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                Icons.Default.Groups,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            "My Research Circles",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            "$clubCount active private ${if (clubCount == 1) "circle" else "circles"}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.Groups,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    IconButton(
-                        onClick = onScanQrClick,
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                        ),
-                        modifier = Modifier.size(38.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.QrCodeScanner,
-                            contentDescription = "Scan QR",
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    FilledTonalButton(
-                        onClick = onJoinClick,
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        modifier = Modifier.height(38.dp)
-                    ) {
-                        Icon(Icons.Outlined.GroupAdd, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Join", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    "My Research Circles",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "$clubCount active private ${if (clubCount == 1) "circle" else "circles"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -672,10 +639,9 @@ fun CreateClubSheet(
     var description by remember { mutableStateOf("") }
     var focusArea by remember { mutableStateOf("") }
     var selectedIconName by remember { mutableStateOf("Rocket") }
-    var selectedColorTriple by remember { mutableStateOf(AstroClubThemes.availableColors[0]) }
 
-    val currentAccentColor = selectedColorTriple.second
-    val currentContainerColor = currentAccentColor.copy(alpha = 0.14f)
+    val currentAccentColor = MaterialTheme.colorScheme.primary
+    val currentContainerColor = MaterialTheme.colorScheme.primaryContainer
     val currentIcon = AstroClubThemes.availableIcons[selectedIconName] ?: Icons.Default.RocketLaunch
 
     val quickTopics = listOf("Exoplanets", "JWST Galaxies", "Gravitational Waves", "Black Holes", "Cosmology", "Fast Radio Bursts")
@@ -857,40 +823,7 @@ fun CreateClubSheet(
                                 modifier = Modifier.fillMaxWidth()
                             )
 
-                            // Immersive Accent Color Palette
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(
-                                    "Material 3 Immersive Accent Color:",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    AstroClubThemes.availableColors.forEach { colorTriple ->
-                                        val isSelected = selectedColorTriple.first == colorTriple.first
-                                        Surface(
-                                            onClick = { selectedColorTriple = colorTriple },
-                                            shape = CircleShape,
-                                            color = colorTriple.second,
-                                            border = if (isSelected) BorderStroke(2.5.dp, MaterialTheme.colorScheme.onSurface) else null,
-                                            modifier = Modifier.size(32.dp)
-                                        ) {
-                                            if (isSelected) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Icon(
-                                                        Icons.Default.Check,
-                                                        contentDescription = null,
-                                                        tint = Color.White,
-                                                        modifier = Modifier.size(16.dp)
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+
 
                             // Personalized Modern Icon Selection from M Icons
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1389,16 +1322,9 @@ fun CreateClubSheet(
 
                                 Button(
                                     onClick = {
-                                        val hex = String.format("#%06X", (0xFFFFFF and android.graphics.Color.rgb(
-                                            (currentAccentColor.red * 255).toInt(),
-                                            (currentAccentColor.green * 255).toInt(),
-                                            (currentAccentColor.blue * 255).toInt()
-                                        )))
                                         val taggedFocusArea = buildString {
-                                            append(if (focusArea.isNotBlank()) focusArea else "Astrophysics")
-                                            append(" [theme:deep_space]")
+                                            append(if (focusArea.isNotBlank()) focusArea.trim() else "Astrophysics")
                                             append(" [icon:$selectedIconName]")
-                                            append(" [color:$hex]")
                                         }
                                         onCreate(name, description, taggedFocusArea, formattedSchedule, location)
                                     },

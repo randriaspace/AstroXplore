@@ -70,7 +70,7 @@ fun GroupDetailsScreen(
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
 
-    var showEditSheet by remember { mutableStateOf(false) }
+    var showSettingsScreen by remember { mutableStateOf(false) }
     var showAddPaperSheet by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var archivePassword by remember { mutableStateOf("") }
@@ -83,7 +83,7 @@ fun GroupDetailsScreen(
 
     BackHandler {
         when {
-            showEditSheet -> showEditSheet = false
+            showSettingsScreen -> showSettingsScreen = false
             showAddPaperSheet -> showAddPaperSheet = false
             showDeleteDialog -> showDeleteDialog = false
             showScheduleSheet -> showScheduleSheet = false
@@ -104,6 +104,84 @@ fun GroupDetailsScreen(
 
     val papersList = (uiState as? GroupDetailsUiState.Success)?.groupPapers ?: emptyList()
 
+    if (showSettingsScreen && group != null) {
+        GroupSettingsScreen(
+            group = group!!,
+            members = members,
+            pendingRequests = pendingRequests,
+            currentUserRole = currentUserRole,
+            currentUserId = currentUserId,
+            isOnline = isOnline,
+            onNavigateBack = { showSettingsScreen = false },
+            onUpdateGroup = { n, d, f, s, l, onSuccess ->
+                viewModel.updateGroup(n, d, f, s, l) {
+                    onSuccess()
+                }
+            },
+            onApproveJoinRequest = { reqId, userId -> viewModel.approveJoinRequest(reqId, userId) },
+            onDeclineJoinRequest = { reqId -> viewModel.declineJoinRequest(reqId) },
+            onPromoteMember = { userId -> viewModel.updateMemberRole(userId, "admin") },
+            onDemoteMember = { userId -> viewModel.updateMemberRole(userId, "member") },
+            onKickMember = { userId -> viewModel.kickMember(userId) },
+            onLeaveGroup = {
+                viewModel.leaveGroup {
+                    showSettingsScreen = false
+                    onNavigateBack()
+                }
+            },
+            onDissolveGroup = { showDeleteDialog = true }
+        )
+
+        if (showDeleteDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    archivePassword = ""
+                    showDeleteDialog = false
+                },
+                title = { Text("Dissolve Journal Club?") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("This dissolves the journal club and removes it permanently from active member listings. Enter confirmation password.")
+                        OutlinedTextField(
+                            value = archivePassword,
+                            onValueChange = { archivePassword = it },
+                            label = { Text("Confirm password") },
+                            singleLine = true,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (archivePassword.isNotBlank()) {
+                                viewModel.archiveGroupWithPassword(archivePassword) {
+                                    archivePassword = ""
+                                    showDeleteDialog = false
+                                    showSettingsScreen = false
+                                    onNavigateBack()
+                                }
+                            }
+                        },
+                        enabled = archivePassword.isNotBlank(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Dissolve Club")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        archivePassword = ""
+                        showDeleteDialog = false
+                    }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+        return
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -113,7 +191,7 @@ fun GroupDetailsScreen(
                 currentUserId = currentUserId,
                 onNavigateBack = onNavigateBack,
                 onInviteClick = viewModel::createInvite,
-                onEditClick = { showEditSheet = true },
+                onEditClick = { showSettingsScreen = true },
                 onSyncCalendarClick = {
                     group?.let { g ->
                         syncGroupToCalendar(context, g)
@@ -233,7 +311,7 @@ fun GroupDetailsScreen(
                         onKick = { targetUserId -> viewModel.kickMember(targetUserId) },
                         onPromote = { targetUserId -> viewModel.updateMemberRole(targetUserId, "admin") },
                         onDemote = { targetUserId -> viewModel.updateMemberRole(targetUserId, "member") },
-                        onEditClick = { showEditSheet = true },
+                        onEditClick = { showSettingsScreen = true },
                         onShareInvite = {
                             val sendIntent = Intent().apply {
                                 action = Intent.ACTION_SEND
@@ -263,19 +341,6 @@ fun GroupDetailsScreen(
             onAdd = { bibcode, title, authors, year ->
                 viewModel.addPaperToShelf(bibcode, title, authors, year)
                 showAddPaperSheet = false
-            }
-        )
-    }
-
-    if (showEditSheet && group != null) {
-        EditGroupSheet(
-            group = group!!,
-            isOnline = isOnline,
-            onDismiss = { showEditSheet = false },
-            onUpdate = { n, d, f, s, l ->
-                viewModel.updateGroup(n, d, f, s, l) {
-                    showEditSheet = false
-                }
             }
         )
     }
