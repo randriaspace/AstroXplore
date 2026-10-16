@@ -80,43 +80,24 @@ class MainViewModel @Inject constructor(
             authRepository.sessionStatus.collect { status ->
                 if (status is SessionStatus.Authenticated) {
                     val userId = authRepository.currentUser?.id ?: ""
-
-                    // 1. Check local DataStore and local Room DB immediately
-                    val isLocalDataStoreOnboarded = settingsRepository.onboardingComplete.first()
-                    val localProfile = if (userId.isNotBlank()) profileRepository.getLocalProfile(userId).firstOrNull() else null
-                    val hasCompleteProfile = localProfile?.let {
-                        it.isOnboarded && !it.affiliationType.isNullOrBlank() && !it.country.isNullOrBlank() && !it.educationLevel.isNullOrBlank()
-                    } == true
-                    val isLocallyOnboarded = isLocalDataStoreOnboarded && hasCompleteProfile
-
-                    if (isLocallyOnboarded) {
-                        _isOnboarded.value = true
-                        settingsRepository.setOnboardingComplete(true)
-                        if (isOnline.value && userId.isNotBlank()) {
-                            syncAll(userId)
-                        }
-                    } else {
-                        // Check remote profile with quick timeout if online before concluding false
-                        var remoteOnboarded = false
-                        if (isOnline.value && userId.isNotBlank()) {
-                            try {
-                                val profile = kotlinx.coroutines.withTimeoutOrNull(2000L) {
-                                    profileRepository.getProfile(userId)
-                                }
-                                remoteOnboarded = profile?.let {
-                                    it.isOnboarded && !it.affiliationType.isNullOrBlank() && !it.country.isNullOrBlank() && !it.educationLevel.isNullOrBlank()
-                                } == true
-                            } catch (_: Exception) {
+                    if (userId.isNotBlank()) {
+                        try {
+                            val profile = kotlinx.coroutines.withTimeoutOrNull(5000L) {
+                                profileRepository.getProfile(userId)
                             }
-                        }
-                        val finalOnboarded = remoteOnboarded
-                        _isOnboarded.value = finalOnboarded
-                        if (finalOnboarded) {
-                            settingsRepository.setOnboardingComplete(true)
-                            if (isOnline.value && userId.isNotBlank()) {
+                            val remoteOnboarded = profile?.let {
+                                it.isOnboarded && !it.affiliationType.isNullOrBlank() && !it.country.isNullOrBlank() && !it.educationLevel.isNullOrBlank()
+                            } == true
+                            _isOnboarded.value = remoteOnboarded
+                            if (remoteOnboarded && isOnline.value) {
                                 syncAll(userId)
                             }
+                        } catch (e: Exception) {
+                            if (e is kotlinx.coroutines.CancellationException) throw e
+                            _isOnboarded.value = false
                         }
+                    } else {
+                        _isOnboarded.value = false
                     }
                 } else {
                     _isOnboarded.value = null
