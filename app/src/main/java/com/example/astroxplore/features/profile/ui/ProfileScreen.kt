@@ -95,10 +95,36 @@ fun ProfileScreen(
                 subtitle = if (uiState.userProfile?.selectedTopics.isNullOrEmpty()) {
                     "Select your research topics (3-6)"
                 } else {
-                    uiState.userProfile?.selectedTopics?.joinToString(", ") ?: ""
+                    "${uiState.userProfile?.selectedTopics?.size} topics selected • Tap to customize"
                 },
                 onClick = onNavigateToInterests
             )
+            val topics = uiState.userProfile?.selectedTopics.orEmpty()
+            if (topics.isNotEmpty()) {
+                FlowRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    topics.forEach { topic ->
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+                        ) {
+                            Text(
+                                text = topic,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         // 4. Appearance & Theme Group

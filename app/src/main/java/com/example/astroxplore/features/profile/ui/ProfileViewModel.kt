@@ -140,10 +140,18 @@ class ProfileViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                profileRepository.getLocalProfile(userId).collect { localProfile ->
+                combine(
+                    profileRepository.getLocalProfile(userId),
+                    profileRepository.getLocalUserPreferences()
+                ) { localProfile, topics ->
                     if (localProfile != null) {
-                        val topics = profileRepository.getLocalUserPreferences().firstOrNull() ?: emptyList()
-                        _userProfile.value = localProfile.toDto(selectedTopics = topics)
+                        localProfile.toDto(selectedTopics = topics)
+                    } else {
+                        _userProfile.value?.copy(selectedTopics = topics)
+                    }
+                }.collect { combinedDto ->
+                    if (combinedDto != null) {
+                        _userProfile.value = combinedDto
                     }
                 }
             } catch (e: Exception) {

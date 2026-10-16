@@ -94,6 +94,21 @@ fun OnboardingScreen(
                                     }
                                 }
                             },
+                            actions = {
+                                TextButton(
+                                    onClick = {
+                                        viewModel.completeOnboarding(
+                                            affiliationType = affiliationType.ifBlank { "Independent Researcher" },
+                                            affiliationName = affiliationName,
+                                            country = country.ifBlank { "Global" },
+                                            educationLevel = educationLevel.ifBlank { "Postgraduate" },
+                                            onSuccess = { onOnboardingComplete() }
+                                        )
+                                    }
+                                ) {
+                                    Text("Skip", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                }
+                            },
                             colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
                         )
                         

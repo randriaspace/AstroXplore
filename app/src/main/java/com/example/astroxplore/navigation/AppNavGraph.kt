@@ -331,13 +331,7 @@ fun RootNavHost(
                 composable<Screen.Interests> {
                     InterestsScreen(
                         onNavigateBack = { navController.popBackStack() },
-                        onPreferencesUpdated = {
-                            navController.navigate(Screen.Feed) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
+                        onPreferencesUpdated = { navController.popBackStack() }
                     )
                 }
 

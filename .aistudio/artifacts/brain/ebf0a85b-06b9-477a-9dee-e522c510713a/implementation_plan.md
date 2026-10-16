@@ -1,12 +1,12 @@
-# Implementation Plan - Modern Flat Material 3 Group UI & Administration Hub (Completed)
+# Implementation Plan - Seamless Onboarding, Profile Roster & Keyword Preferences (Completed)
 
-Overhaul the Journal Club Group UI and UX by removing gradient visuals in favor of clean, flat Material 3 surfaces, eliminating duplicate join actions, removing accent color pickers from creation, and transforming the group settings into a dedicated full-screen Administration & Management page.
+Ensure users are never inappropriately forced into Onboarding if their profile already exists, fix the navigation flaw where updating keywords redirects away from the Profile screen to the Feed, and provide a real-time reactive keyword editor with full-screen tag selection.
 
 ## Status: COMPLETED
 
 All planned enhancements have been implemented and verified:
-1. **Flat Material 3 Palette**: Stripped away all heavy gradient backgrounds across the application (`GroupHeroHeader`, `SpotifyStyleResearchHub`, `AiResearchBriefingCard`, `OnboardingScreen`, and `InterestsScreen`) in favor of flat M3 surface containers with subtle, crisp borders (`outlineVariant`).
-2. **Simplified Group Creation**: Removed arbitrary accent color pickers and hex code generation from `CreateClubSheet`. Groups use clean semantic M3 theme tokens and custom astronomical iconography.
-3. **Consolidated Actions**: Removed duplicate "Scan QR" and "Join" buttons from the "My Research Circles" section header; actions now live exclusively in the top app bar.
-4. **Full-Screen Settings & Administration**: Replaced the edit pen icon with a Settings gear icon (`Icons.Default.Settings`) in `GroupHeroHeader`. Created and integrated `GroupSettingsScreen.kt` with full support for updating club metadata, managing member rosters and permissions, reviewing pending join requests, and executing founder club dissolution.
-5. **Quality Verification**: Verified clean compilation with `compile_applet` and confirmed all unit tests pass with `gradle :app:testDebugUnitTest`.
+1. **Profile Navigation Fix (`AppNavGraph.kt`)**: Updated `Screen.Interests` destination so `onPreferencesUpdated` calls `navController.popBackStack()`. When saving keywords, the user returns directly to the Profile screen instead of being booted to the Feed.
+2. **Onboarding Gate Logic (`MainViewModel.kt` & `LoginViewModel.kt`)**: Enhanced onboarding detection to check if the user already has profile details (affiliation, name, institution). If existing profile details or `isOnboarded` are present, onboarding is bypassed automatically and marked completed in `settingsRepository`.
+3. **Onboarding Skip Option (`OnboardingScreen.kt`)**: Added a prominent "Skip" button in the TopAppBar of the Onboarding screen so users are never trapped and can explore preprints immediately.
+4. **Reactive Profile Topic Updates (`ProfileViewModel.kt` & `ProfileScreen.kt`)**: Combined local profile Flow and user preferences Flow in `ProfileViewModel` so changes to keywords made in `InterestsScreen` immediately reflect on `ProfileScreen` with clean Material 3 chips.
+5. **Quality Verification**: Clean compilation confirmed with `compile_applet` and all unit tests passed with `gradle :app:testDebugUnitTest`.
