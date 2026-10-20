@@ -8,6 +8,9 @@ public sealed interface Screen {
     data object AuthGraph : Screen
 
     @Serializable
+    data object AppTour : Screen
+
+    @Serializable
     data object OnboardingGraph : Screen
 
     @Serializable

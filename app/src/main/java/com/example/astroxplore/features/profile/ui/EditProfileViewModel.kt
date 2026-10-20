@@ -9,6 +9,7 @@ import com.example.astroxplore.features.profile.model.ProfileModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.jsonPrimitive
@@ -69,27 +70,30 @@ class EditProfileViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            // Build immediate fallback from user metadata so screen never hangs
-            val metadata = user.userMetadata
-            val metadataMap = metadata?.entries?.associate { it.key to it.value.jsonPrimitive.content }
-            val firstNameFromAuth = metadataMap?.get("first_name") ?: ""
-            val lastNameFromAuth = metadataMap?.get("last_name") ?: ""
-            val fullNameFromAuth = metadataMap?.get("full_name")
-                ?: listOf(firstNameFromAuth, lastNameFromAuth).filter { it.isNotBlank() }.joinToString(" ").ifBlank { "Scholar" }
+            // First check local Room cache so we display user's real saved profile immediately
+            val localProfile = profileRepository.getLocalProfile(userId).firstOrNull()
+            if (localProfile != null) {
+                _uiState.value = EditProfileUiState.Success(localProfile)
+            } else {
+                val metadata = user.userMetadata
+                val metadataMap = metadata?.entries?.associate { it.key to it.value.jsonPrimitive.content }
+                val firstNameFromAuth = metadataMap?.get("first_name") ?: ""
+                val lastNameFromAuth = metadataMap?.get("last_name") ?: ""
+                val fullNameFromAuth = metadataMap?.get("full_name")
+                    ?: listOf(firstNameFromAuth, lastNameFromAuth).filter { it.isNotBlank() }.joinToString(" ").ifBlank { "Scholar" }
 
-            val fallback = ProfileModel(
-                id = userId,
-                email = user.email ?: "",
-                firstName = firstNameFromAuth,
-                lastName = lastNameFromAuth,
-                fullName = fullNameFromAuth,
-                affiliationType = "Individual",
-                institution = "Independent Researcher",
-                isOnboarded = false
-            )
-
-            // Emit fallback immediately to guarantee zero delay and responsive UI
-            _uiState.value = EditProfileUiState.Success(fallback)
+                val fallback = ProfileModel(
+                    id = userId,
+                    email = user.email ?: "",
+                    firstName = firstNameFromAuth,
+                    lastName = lastNameFromAuth,
+                    fullName = fullNameFromAuth,
+                    affiliationType = "Individual",
+                    institution = "Independent Researcher",
+                    isOnboarded = false
+                )
+                _uiState.value = EditProfileUiState.Success(fallback)
+            }
 
             // Then observe local profile changes (Room)
             launch {
@@ -100,18 +104,16 @@ class EditProfileViewModel @Inject constructor(
                 }
             }
 
-            // Sync from remote Supabase
+            // Sync from remote Supabase without wiping out local cache on error
             launch {
                 try {
                     val remote = profileRepository.getProfile(userId)
                     if (remote != null) {
                         _uiState.value = EditProfileUiState.Success(remote)
-                    } else {
-                        // Persist fallback to local and remote if remote does not exist yet
-                        profileRepository.updateProfile(fallback)
                     }
-                } catch (_: Exception) {
-                    profileRepository.updateProfile(fallback)
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    // Retain local Room data on failure
                 }
             }
         }
@@ -125,7 +127,8 @@ class EditProfileViewModel @Inject constructor(
         country: String,
         educationLevel: String,
         institution: String?,
-        orcidId: String?
+        orcidId: String?,
+        onSuccess: (() -> Unit)? = null
     ) {
         val user = authRepository.currentUser
         val userEmail = user?.email ?: (uiState.value as? EditProfileUiState.Success)?.profile?.email ?: ""
@@ -139,7 +142,7 @@ class EditProfileViewModel @Inject constructor(
             email = if (currentProfile.email.isNotBlank()) currentProfile.email else userEmail,
             firstName = firstName,
             lastName = lastName,
-            fullName = listOf(firstName, lastName).filter { it.isNotBlank() }.joinToString(" "),
+            fullName = listOf(firstName, lastName).filter { it.isNotBlank() }.joinToString(" ").ifBlank { currentProfile.fullName ?: "Scholar" },
             affiliationType = affiliationType,
             affiliationName = affiliationName,
             country = country,
@@ -154,6 +157,7 @@ class EditProfileViewModel @Inject constructor(
         viewModelScope.launch {
             profileRepository.updateProfile(updatedProfile)
             settingsRepository.setOnboardingComplete(true)
+            onSuccess?.invoke()
         }
     }
 }

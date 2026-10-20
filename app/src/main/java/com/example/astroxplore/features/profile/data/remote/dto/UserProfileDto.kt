@@ -34,10 +34,12 @@ fun UserProfileDto.toProfileModel(email: String = ""): ProfileModel {
 }
 
 fun ProfileModel.toDto(selectedTopics: List<String> = emptyList()): UserProfileDto {
+    val computedName = listOfNotNull(firstName, lastName).filter { it.isNotBlank() }.joinToString(" ")
+    val finalName = if (computedName.isNotBlank()) computedName else fullName?.takeIf { it.isNotBlank() } ?: "Scholar"
     return UserProfileDto(
         id = id,
-        fullName = fullName ?: listOfNotNull(firstName, lastName).filter { it.isNotBlank() }.joinToString(" "),
-        institution = institution ?: affiliationName,
+        fullName = finalName,
+        institution = institution?.takeIf { it.isNotBlank() } ?: affiliationName?.takeIf { it.isNotBlank() } ?: "Independent Researcher",
         orcidId = orcidId,
         selectedTopics = selectedTopics
     )

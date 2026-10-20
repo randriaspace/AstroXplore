@@ -39,6 +39,10 @@ fun ProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    LaunchedEffect(Unit) {
+        viewModel.loadData()
+    }
+
     if (uiState.showLogoutDialog) {
         LogoutDialog(
             onDismiss = { viewModel.setShowLogoutDialog(false) },

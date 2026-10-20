@@ -113,15 +113,17 @@ class ProfileViewModel @Inject constructor(
         val fullNameFromAuth = metadataMap?.get("full_name")
             ?: listOf(firstNameFromAuth, lastNameFromAuth).filter { it.isNotBlank() }.joinToString(" ").ifBlank { "Scholar" }
 
-        val fallbackDto = UserProfileDto(
-            id = userId,
-            fullName = fullNameFromAuth,
-            institution = "Independent Researcher",
-            orcidId = null,
-            selectedTopics = emptyList()
-        )
-        _userProfile.value = fallbackDto
-        _isLoading.value = true
+        if (_userProfile.value == null) {
+            val fallbackDto = UserProfileDto(
+                id = userId,
+                fullName = fullNameFromAuth,
+                institution = "Independent Researcher",
+                orcidId = null,
+                selectedTopics = emptyList()
+            )
+            _userProfile.value = fallbackDto
+            _isLoading.value = true
+        }
 
         viewModelScope.launch {
             try {

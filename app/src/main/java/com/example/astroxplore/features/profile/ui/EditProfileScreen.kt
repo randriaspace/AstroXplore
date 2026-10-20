@@ -53,7 +53,7 @@ fun EditProfileScreen(
             )
         }
     ) { innerPadding ->
-        when (uiState) {
+        when (val state = uiState) {
             is EditProfileUiState.Loading -> {
                 Box(
                     modifier = Modifier
@@ -68,15 +68,63 @@ fun EditProfileScreen(
                 }
             }
             is EditProfileUiState.Success -> {
-                val profile = (uiState as EditProfileUiState.Success).profile
+                val profile = state.profile
                 
-                var firstName by remember { mutableStateOf(profile.firstName ?: "") }
-                var lastName by remember { mutableStateOf(profile.lastName ?: "") }
-                var affiliationType by remember { mutableStateOf(profile.affiliationType ?: "") }
-                var affiliationName by remember { mutableStateOf(profile.affiliationName ?: profile.institution ?: "") }
-                var country by remember { mutableStateOf(profile.country ?: "") }
-                var educationLevel by remember { mutableStateOf(profile.educationLevel ?: "") }
-                var orcidId by remember { mutableStateOf(profile.orcidId ?: "") }
+                var firstName by remember(profile.id) { mutableStateOf(profile.firstName ?: "") }
+                var lastName by remember(profile.id) { mutableStateOf(profile.lastName ?: "") }
+                var affiliationType by remember(profile.id) { mutableStateOf(profile.affiliationType ?: "Individual") }
+                var affiliationName by remember(profile.id) { mutableStateOf(profile.affiliationName ?: profile.institution ?: "") }
+                var country by remember(profile.id) { mutableStateOf(profile.country ?: "") }
+                var educationLevel by remember(profile.id) { mutableStateOf(profile.educationLevel ?: "") }
+                var orcidId by remember(profile.id) { mutableStateOf(profile.orcidId ?: "") }
+
+                var hasUserEdited by remember { mutableStateOf(false) }
+
+                // Sync whenever profile emits from local Room or remote Supabase if user hasn't overwritten
+                LaunchedEffect(profile) {
+                    if (!hasUserEdited) {
+                        firstName = profile.firstName ?: ""
+                        lastName = profile.lastName ?: ""
+                        affiliationType = profile.affiliationType ?: "Individual"
+                        affiliationName = profile.affiliationName ?: profile.institution ?: ""
+                        country = profile.country ?: ""
+                        educationLevel = profile.educationLevel ?: ""
+                        orcidId = profile.orcidId ?: ""
+                    }
+                }
+
+                // Debounced auto-save on field change to prevent any data loss
+                LaunchedEffect(firstName, lastName, affiliationType, affiliationName, country, educationLevel, orcidId) {
+                    if (hasUserEdited) {
+                        kotlinx.coroutines.delay(800L)
+                        viewModel.updateProfile(
+                            firstName = firstName,
+                            lastName = lastName,
+                            affiliationType = affiliationType,
+                            affiliationName = affiliationName,
+                            country = country,
+                            educationLevel = educationLevel,
+                            institution = affiliationName,
+                            orcidId = orcidId
+                        )
+                    }
+                }
+
+                val saveAndExit: () -> Unit = {
+                    viewModel.updateProfile(
+                        firstName = firstName,
+                        lastName = lastName,
+                        affiliationType = affiliationType,
+                        affiliationName = affiliationName,
+                        country = country,
+                        educationLevel = educationLevel,
+                        institution = affiliationName,
+                        orcidId = orcidId,
+                        onSuccess = onNavigateBack
+                    )
+                }
+
+                BackHandler(onBack = saveAndExit)
 
                 var showAffiliationPicker by remember { mutableStateOf(false) }
                 var showCountryPicker by remember { mutableStateOf(false) }
@@ -88,7 +136,10 @@ fun EditProfileScreen(
                         options = viewModel.affiliationTypes,
                         selectedOption = affiliationType,
                         showSearch = false,
-                        onOptionSelected = { affiliationType = it },
+                        onOptionSelected = { 
+                            affiliationType = it
+                            hasUserEdited = true
+                        },
                         onDismiss = { showAffiliationPicker = false }
                     )
                 }
@@ -99,7 +150,10 @@ fun EditProfileScreen(
                         options = viewModel.countries,
                         selectedOption = country,
                         showSearch = true,
-                        onOptionSelected = { country = it },
+                        onOptionSelected = { 
+                            country = it
+                            hasUserEdited = true
+                        },
                         onDismiss = { showCountryPicker = false }
                     )
                 }
@@ -110,7 +164,10 @@ fun EditProfileScreen(
                         options = viewModel.educationLevels,
                         selectedOption = educationLevel,
                         showSearch = false,
-                        onOptionSelected = { educationLevel = it },
+                        onOptionSelected = { 
+                            educationLevel = it
+                            hasUserEdited = true
+                        },
                         onDismiss = { showEducationPicker = false }
                     )
                 }
@@ -193,7 +250,10 @@ fun EditProfileScreen(
 
                             OutlinedTextField(
                                 value = firstName,
-                                onValueChange = { firstName = it },
+                                onValueChange = { 
+                                    firstName = it 
+                                    hasUserEdited = true
+                                },
                                 label = { Text("First Name") },
                                 modifier = Modifier.fillMaxWidth(),
                                 leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
@@ -203,7 +263,10 @@ fun EditProfileScreen(
 
                             OutlinedTextField(
                                 value = lastName,
-                                onValueChange = { lastName = it },
+                                onValueChange = { 
+                                    lastName = it 
+                                    hasUserEdited = true
+                                },
                                 label = { Text("Last Name") },
                                 modifier = Modifier.fillMaxWidth(),
                                 leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
@@ -256,7 +319,10 @@ fun EditProfileScreen(
                             if (affiliationType != "Individual" && affiliationType.isNotEmpty()) {
                                 OutlinedTextField(
                                     value = affiliationName,
-                                    onValueChange = { affiliationName = it },
+                                    onValueChange = { 
+                                        affiliationName = it 
+                                        hasUserEdited = true
+                                    },
                                     label = { Text("Institution / Organization Name") },
                                     modifier = Modifier.fillMaxWidth(),
                                     leadingIcon = { Icon(Icons.Outlined.Business, contentDescription = null) },
@@ -331,7 +397,10 @@ fun EditProfileScreen(
 
                             OutlinedTextField(
                                 value = orcidId,
-                                onValueChange = { orcidId = it },
+                                onValueChange = { 
+                                    orcidId = it 
+                                    hasUserEdited = true
+                                },
                                 label = { Text("ORCID iD") },
                                 modifier = Modifier.fillMaxWidth(),
                                 leadingIcon = { Icon(Icons.Outlined.Badge, contentDescription = null) },
@@ -345,19 +414,7 @@ fun EditProfileScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Button(
-                        onClick = {
-                            viewModel.updateProfile(
-                                firstName = firstName,
-                                lastName = lastName,
-                                affiliationType = affiliationType,
-                                affiliationName = affiliationName,
-                                country = country,
-                                educationLevel = educationLevel,
-                                institution = affiliationName,
-                                orcidId = orcidId
-                            )
-                            onNavigateBack()
-                        },
+                        onClick = saveAndExit,
                         modifier = Modifier.fillMaxWidth().height(56.dp),
                         shape = MaterialTheme.shapes.extraLarge
                     ) {

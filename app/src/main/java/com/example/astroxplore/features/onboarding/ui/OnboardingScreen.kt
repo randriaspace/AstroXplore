@@ -54,6 +54,7 @@ fun OnboardingScreen(
     var affiliationName by remember { mutableStateOf("") }
     var country by remember { mutableStateOf("") }
     var educationLevel by remember { mutableStateOf("") }
+    var orcidId by remember { mutableStateOf("") }
 
     // Step Interests
     val selectedInterests by viewModel.selectedInterests.collectAsState()
@@ -102,6 +103,7 @@ fun OnboardingScreen(
                                             affiliationName = affiliationName,
                                             country = country.ifBlank { "Global" },
                                             educationLevel = educationLevel.ifBlank { "Postgraduate" },
+                                            orcidId = orcidId.ifBlank { null },
                                             onSuccess = { onOnboardingComplete() }
                                         )
                                     }
@@ -147,6 +149,7 @@ fun OnboardingScreen(
                                             affiliationName = affiliationName,
                                             country = country,
                                             educationLevel = educationLevel,
+                                            orcidId = orcidId.ifBlank { null },
                                             onSuccess = { showSuccess = true }
                                         )
                                     },
@@ -207,6 +210,8 @@ fun OnboardingScreen(
                                     onCountryChange = { country = it },
                                     educationLevel = educationLevel,
                                     onEducationLevelChange = { educationLevel = it },
+                                    orcidId = orcidId,
+                                    onOrcidIdChange = { orcidId = it },
                                     viewModel = viewModel
                                 )
                             }
@@ -248,6 +253,8 @@ fun ProfessionalStep(
     onCountryChange: (String) -> Unit,
     educationLevel: String,
     onEducationLevelChange: (String) -> Unit,
+    orcidId: String = "",
+    onOrcidIdChange: (String) -> Unit = {},
     viewModel: OnboardingViewModel
 ) {
     var showAffiliationPicker by remember { mutableStateOf(false) }
@@ -370,6 +377,19 @@ fun ProfessionalStep(
                 )
             )
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ORCID iD Input Field
+        OutlinedTextField(
+            value = orcidId,
+            onValueChange = onOrcidIdChange,
+            label = { Text("ORCID iD (Optional)") },
+            placeholder = { Text("0000-0000-0000-0000") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            singleLine = true
+        )
     }
 }
 

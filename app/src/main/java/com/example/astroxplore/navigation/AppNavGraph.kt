@@ -72,6 +72,7 @@ import com.example.astroxplore.features.groups.ui.GroupDetailsScreen
 import com.example.astroxplore.features.groups.ui.GroupsScreen
 import com.example.astroxplore.features.library.ui.LibraryScreen
 import com.example.astroxplore.features.library.ui.PdfViewerScreen
+import com.example.astroxplore.features.onboarding.ui.AppTourScreen
 import com.example.astroxplore.features.onboarding.ui.OnboardingScreen
 import com.example.astroxplore.features.profile.ui.EditProfileScreen
 import com.example.astroxplore.features.profile.ui.InterestsScreen
@@ -114,6 +115,7 @@ fun RootNavHost(
     navController: NavHostController,
     startDestination: Screen,
     sessionStatus: SessionStatus,
+    onCompleteAppTour: () -> Unit = {},
     onScrollToTop: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -124,7 +126,8 @@ fun RootNavHost(
     LaunchedEffect(sessionStatus, currentDestination) {
         if (sessionStatus is SessionStatus.NotAuthenticated &&
             currentDestination != null &&
-            !currentDestination.isInAuthGraph()
+            !currentDestination.isInAuthGraph() &&
+            !currentDestination.hasRoute<Screen.AppTour>()
         ) {
             navController.navigate(Screen.AuthGraph) {
                 when {
@@ -197,6 +200,25 @@ fun RootNavHost(
                 }
             }
         ) {
+            composable<Screen.AppTour> {
+                AppTourScreen(
+                    onGetStarted = {
+                        onCompleteAppTour()
+                        navController.navigate(Screen.Signup) {
+                            popUpTo<Screen.AppTour> { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                    onSignIn = {
+                        onCompleteAppTour()
+                        navController.navigate(Screen.Login) {
+                            popUpTo<Screen.AppTour> { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
             navigation<Screen.AuthGraph>(startDestination = Screen.Login) {
                 composable<Screen.Login> {
                     LoginScreen(

@@ -50,6 +50,8 @@ class SettingsRepository @Inject constructor(
             preferences[PreferencesKeys.ONBOARDING_COMPLETE] ?: false
         }
 
+    val appTourComplete: Flow<Boolean> = onboardingComplete
+
     suspend fun setThemeMode(mode: ThemeMode) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.THEME_MODE] = mode.name
@@ -66,5 +68,9 @@ class SettingsRepository @Inject constructor(
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.ONBOARDING_COMPLETE] = complete
         }
+    }
+
+    suspend fun setAppTourComplete(complete: Boolean) {
+        setOnboardingComplete(complete)
     }
 }

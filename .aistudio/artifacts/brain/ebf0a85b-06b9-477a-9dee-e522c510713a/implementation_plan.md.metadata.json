@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for fixing the Onboarding redirection bug (when profiles are missing or incomplete) and overhauling the UI/UX of Onboarding and Edit Profile screens.",
-  "updatedAt": "2026-10-16T11:53:59.557395343Z",
+  "summary": "Implementation plan for separating first-launch App Feature Tour (cached locally in DataStore) from Post-Registration Academic Profile Setup, and fixing real-time profile editing sync so info is never lost or reset to empty.",
+  "updatedAt": "2026-10-20T05:01:23.395931426Z",
   "requestFeedback": true,
   "userFacing": true
 }

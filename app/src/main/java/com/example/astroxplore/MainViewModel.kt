@@ -57,10 +57,24 @@ class MainViewModel @Inject constructor(
             initialValue = false
         )
 
+    val isAppTourComplete: StateFlow<Boolean?> = settingsRepository.appTourComplete
+        .map<Boolean, Boolean?> { it }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = null
+        )
+
     private val _isOnboarded = MutableStateFlow<Boolean?>(null)
     val isOnboarded: StateFlow<Boolean?> = _isOnboarded.asStateFlow()
 
     val scrollToTopEvent = navigationSignal.scrollToTop
+
+    fun completeAppTour() {
+        viewModelScope.launch {
+            settingsRepository.setAppTourComplete(true)
+        }
+    }
 
     init {
         // Enforce 2-second timeout for offline launch resilience.
@@ -69,11 +83,6 @@ class MainViewModel @Inject constructor(
             kotlinx.coroutines.delay(2000L)
             if (sessionStatus.value == SessionStatus.Initializing) {
                 _isInitTimeout.value = true
-                // If local onboarding was completed, set it, otherwise allow offline guest
-                val isLocalDataStoreOnboarded = settingsRepository.onboardingComplete.first()
-                if (isLocalDataStoreOnboarded) {
-                    _isOnboarded.value = true
-                }
             }
         }
         viewModelScope.launch {
@@ -82,9 +91,10 @@ class MainViewModel @Inject constructor(
                     val userId = authRepository.currentUser?.id ?: ""
                     if (userId.isNotBlank()) {
                         try {
-                            val profile = kotlinx.coroutines.withTimeoutOrNull(5000L) {
+                            val profile = kotlinx.coroutines.withTimeoutOrNull(4000L) {
                                 profileRepository.getProfile(userId)
-                            }
+                            } ?: profileRepository.getLocalProfile(userId).firstOrNull()
+
                             val remoteOnboarded = profile?.let {
                                 it.isOnboarded && !it.affiliationType.isNullOrBlank() && !it.country.isNullOrBlank() && !it.educationLevel.isNullOrBlank()
                             } == true
@@ -94,7 +104,11 @@ class MainViewModel @Inject constructor(
                             }
                         } catch (e: Exception) {
                             if (e is kotlinx.coroutines.CancellationException) throw e
-                            _isOnboarded.value = false
+                            val local = profileRepository.getLocalProfile(userId).firstOrNull()
+                            val localOnboarded = local?.let {
+                                it.isOnboarded && !it.affiliationType.isNullOrBlank() && !it.country.isNullOrBlank() && !it.educationLevel.isNullOrBlank()
+                            } == true
+                            _isOnboarded.value = localOnboarded
                         }
                     } else {
                         _isOnboarded.value = false

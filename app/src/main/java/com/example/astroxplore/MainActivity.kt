@@ -87,11 +87,14 @@ class MainActivity : ComponentActivity() {
                 dynamicColor = dynamicColorEnabled,
             ) {
                 val isOnboarded by mainViewModel.isOnboarded.collectAsState()
+                val isAppTourComplete by mainViewModel.isAppTourComplete.collectAsState()
                 AstroXploreMain(
                     sessionStatus = sessionStatus,
                     isOnboarded = isOnboarded,
+                    isAppTourComplete = isAppTourComplete,
                     isInitTimeout = isInitTimeout,
                     navController = navController,
+                    onCompleteAppTour = { mainViewModel.completeAppTour() },
                     onScrollToTop = { mainViewModel.triggerScrollToTop() }
                 )
             }
@@ -104,18 +107,25 @@ class MainActivity : ComponentActivity() {
 fun AstroXploreMain(
     sessionStatus: SessionStatus = SessionStatus.Initializing,
     isOnboarded: Boolean? = null,
+    isAppTourComplete: Boolean? = null,
     isInitTimeout: Boolean = false,
     navController: NavHostController = rememberNavController(),
+    onCompleteAppTour: () -> Unit = {},
     onScrollToTop: () -> Unit = {}
 ) {
     // Definitive readiness gate: wait until session is not Initializing,
     // or if 2-second timeout elapsed (offline launch), immediately unblock.
-    val isReady = isInitTimeout || sessionStatus !is SessionStatus.Initializing
+    val isReady = isInitTimeout || (sessionStatus !is SessionStatus.Initializing && isAppTourComplete != null)
 
-    val startDestination = remember(isReady, sessionStatus) {
+    val startDestination = remember(isReady, sessionStatus, isAppTourComplete, isOnboarded) {
         if (!isReady) null
-        else when (sessionStatus) {
-            is SessionStatus.Authenticated -> Screen.MainGraph
+        else if (isAppTourComplete == false) {
+            Screen.AppTour
+        } else when (sessionStatus) {
+            is SessionStatus.Authenticated -> {
+                if (isOnboarded == false) Screen.OnboardingGraph
+                else Screen.MainGraph
+            }
             is SessionStatus.NotAuthenticated -> Screen.AuthGraph
             else -> Screen.MainGraph
         }
@@ -128,6 +138,7 @@ fun AstroXploreMain(
                 navController = navController,
                 startDestination = startDestination,
                 sessionStatus = sessionStatus,
+                onCompleteAppTour = onCompleteAppTour,
                 onScrollToTop = onScrollToTop
             )
         }

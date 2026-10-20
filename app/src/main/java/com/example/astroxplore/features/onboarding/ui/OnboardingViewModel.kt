@@ -110,6 +110,7 @@ class OnboardingViewModel @Inject constructor(
         affiliationName: String?,
         country: String,
         educationLevel: String,
+        orcidId: String? = null,
         onSuccess: () -> Unit
     ) {
         viewModelScope.launch {
@@ -128,6 +129,7 @@ class OnboardingViewModel @Inject constructor(
                     affiliationName = affiliationName,
                     country = country,
                     educationLevel = educationLevel,
+                    orcidId = orcidId,
                     isOnboarded = true
                 )
                 profileRepository.updateProfile(updatedProfile)
