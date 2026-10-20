@@ -98,20 +98,10 @@ class ProfileRepository @Inject constructor(
 
     suspend fun getUserProfileDto(userId: String): UserProfileDto? = withContext(Dispatchers.IO) {
         try {
-            val remoteDto = supabaseClient.postgrest["profiles"]
-                .select(columns = Columns.ALL) {
-                    filter {
-                        eq("id", userId)
-                    }
-                }
-                .decodeSingleOrNull<UserProfileDto>()
-
-            if (remoteDto != null) {
-                return@withContext remoteDto
-            } else {
-                val profileModel = getProfile(userId)
-                val localTopics = keywordDao.getUserPreferences().firstOrNull()?.map { it.keyword } ?: emptyList()
-                return@withContext profileModel?.toDto(selectedTopics = localTopics)
+            val userPrefs = getUserPreferences(userId)
+            val profileModel = getProfile(userId)
+            if (profileModel != null) {
+                return@withContext profileModel.toDto(selectedTopics = userPrefs)
             }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
@@ -125,17 +115,6 @@ class ProfileRepository @Inject constructor(
     }
 
     suspend fun updateSelectedTopics(userId: String, topics: List<String>) = withContext(Dispatchers.IO) {
-        try {
-            supabaseClient.postgrest["profiles"].update({
-                set("selected_topics", topics)
-            }) {
-                filter {
-                    eq("id", userId)
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
         syncUserPreferences(userId, topics)
     }
 
@@ -270,6 +249,9 @@ class ProfileRepository @Inject constructor(
     }
 
     suspend fun syncUserPreferences(userId: String, keywordTags: List<String>) = withContext(Dispatchers.IO) {
+        // Sync to local Room cache immediately
+        keywordDao.syncUserPreferences(keywordTags.map { UserPreferenceEntity(it) })
+
         try {
             val profile = getProfile(userId)
             if (profile == null) {
@@ -280,7 +262,7 @@ class ProfileRepository @Inject constructor(
                     put("is_onboarded", true)
                 }
                 supabaseClient.postgrest["profiles"].upsert(payload)
-            } else {
+            } else if (!profile.isOnboarded) {
                 supabaseClient.postgrest["profiles"].update({
                     set("is_onboarded", true)
                 }) {
@@ -297,14 +279,16 @@ class ProfileRepository @Inject constructor(
             }
             
             val preferences = keywordTags.map { tag ->
-                UserPreference(userId = userId, keywordTag = tag)
+                buildJsonObject {
+                    put("user_id", userId)
+                    put("keyword_tag", tag)
+                }
             }
             if (preferences.isNotEmpty()) {
                 supabaseClient.postgrest["user_preferences"].insert(preferences)
             }
-
-            keywordDao.syncUserPreferences(keywordTags.map { UserPreferenceEntity(it) })
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             e.printStackTrace()
         }
     }
