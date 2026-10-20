@@ -3,7 +3,6 @@ package com.example.astroxplore.features.library.ui
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.pdf.PdfRenderer
 import android.os.Bundle
 import android.os.CancellationSignal
 import android.os.ParcelFileDescriptor
@@ -15,12 +14,13 @@ import android.print.PrintManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,35 +30,37 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.CloudDownload
-import androidx.compose.material.icons.outlined.Print
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Remove
-import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.example.astroxplore.core.ui.components.AstroLoadingSize
 import com.example.astroxplore.core.ui.components.AstroM3CircularProgressIndicator
+import com.example.astroxplore.features.library.ui.pdf.PdfPageRendererEngine
+import com.example.astroxplore.features.library.ui.pdf.PdfThumbnailGridSheet
+import com.example.astroxplore.features.library.ui.pdf.ZoomableBox
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,32 +73,51 @@ fun PdfViewerScreen(
     val scope = rememberCoroutineScope()
     val file = remember(pdfFilePath) { File(pdfFilePath) }
 
-    var pdfPages by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
+    val engine = remember(file) { PdfPageRendererEngine(file) }
+    DisposableEffect(engine) {
+        onDispose { engine.close() }
+    }
+
     var isLoading by remember { mutableStateOf(true) }
     var totalPages by remember { mutableIntStateOf(0) }
     var renderError by remember { mutableStateOf<String?>(null) }
+    var reloadTrigger by remember { mutableIntStateOf(0) }
 
     val listState = rememberLazyListState()
 
     var scale by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
+    var isNightMode by remember { mutableStateOf(false) }
+    var showThumbnailSheet by remember { mutableStateOf(false) }
+    var isScrubberVisible by remember { mutableStateOf(true) }
 
-    var reloadTrigger by remember { mutableIntStateOf(0) }
+    // High contrast night-mode color inversion matrix
+    val nightModeColorFilter = remember(isNightMode) {
+        if (isNightMode) {
+            ColorFilter.colorMatrix(
+                ColorMatrix(
+                    floatArrayOf(
+                        -1f,  0f,  0f, 0f, 255f,
+                         0f, -1f,  0f, 0f, 255f,
+                         0f,  0f, -1f, 0f, 255f,
+                         0f,  0f,  0f, 1f,   0f
+                    )
+                )
+            )
+        } else null
+    }
 
     LaunchedEffect(file, reloadTrigger) {
         isLoading = true
         renderError = null
 
         withContext(Dispatchers.IO) {
-            // Briefly poll for the file in case background download write is finalizing
             var attempts = 0
             while (!file.exists() && attempts < 6) {
-                kotlinx.coroutines.delay(500)
+                delay(500)
                 attempts++
             }
 
-            if (!file.exists()) {
+            if (!file.exists() || file.length() == 0L) {
                 withContext(Dispatchers.Main) {
                     renderError = "The PDF file is still being downloaded or not found locally."
                     isLoading = false
@@ -104,36 +125,13 @@ fun PdfViewerScreen(
                 return@withContext
             }
 
-            try {
-                val fileDescriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-                val renderer = PdfRenderer(fileDescriptor)
-                totalPages = renderer.pageCount
-
-                val bitmaps = mutableListOf<Bitmap>()
-                val targetWidth = (context.resources.displayMetrics.widthPixels * 1.5f).toInt()
-
-                for (i in 0 until renderer.pageCount) {
-                    val page = renderer.openPage(i)
-                    val aspectRatio = page.height.toFloat() / page.width.toFloat()
-                    val targetHeight = (targetWidth * aspectRatio).toInt()
-
-                    val bitmap = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
-                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                    bitmaps.add(bitmap)
-                    page.close()
-                }
-
-                renderer.close()
-                fileDescriptor.close()
-
-                withContext(Dispatchers.Main) {
-                    pdfPages = bitmaps
+            val initialized = engine.init()
+            withContext(Dispatchers.Main) {
+                if (initialized && engine.pageCount > 0) {
+                    totalPages = engine.pageCount
                     isLoading = false
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                withContext(Dispatchers.Main) {
-                    renderError = "Failed to render PDF: ${e.localizedMessage}"
+                } else {
+                    renderError = "Failed to parse PDF document. File may be corrupted."
                     isLoading = false
                 }
             }
@@ -143,6 +141,7 @@ fun PdfViewerScreen(
     val visibleItemIndex by remember {
         derivedStateOf { listState.firstVisibleItemIndex }
     }
+    val currentPage = remember(visibleItemIndex) { (visibleItemIndex + 1).coerceAtLeast(1) }
 
     Scaffold(
         topBar = {
@@ -183,7 +182,7 @@ fun PdfViewerScreen(
                             if (totalPages > 0) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Page ${visibleItemIndex + 1} of $totalPages",
+                                    text = "Page $currentPage of $totalPages",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -197,6 +196,27 @@ fun PdfViewerScreen(
                     }
                 },
                 actions = {
+                    // Dark Mode / Night Inversion Toggle
+                    IconButton(
+                        onClick = { isNightMode = !isNightMode },
+                        modifier = Modifier.testTag("pdf_viewer_night_mode_button")
+                    ) {
+                        Icon(
+                            imageVector = if (isNightMode) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
+                            contentDescription = if (isNightMode) "Light Mode" else "Night Inversion Mode",
+                            tint = if (isNightMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    // Thumbnail Grid Sheet Action
+                    IconButton(
+                        onClick = { showThumbnailSheet = true },
+                        enabled = totalPages > 0,
+                        modifier = Modifier.testTag("pdf_viewer_thumbnails_button")
+                    ) {
+                        Icon(Icons.Outlined.GridView, contentDescription = "Thumbnails Overview")
+                    }
+
                     // Print PDF Document Action
                     IconButton(
                         onClick = { printPdfDocument(context, file, paperTitle) },
@@ -236,26 +256,26 @@ fun PdfViewerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(Color(0xFF1E1E1E)),
-            contentAlignment = Alignment.Center
+                .background(if (isNightMode) Color(0xFF0F1117) else Color(0xFF1E1E1E))
         ) {
             when {
                 isLoading -> {
-                    AstroM3CircularProgressIndicator(
-                        size = AstroLoadingSize.LARGE,
-                        label = "Rendering PDF pages...",
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    )
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        AstroM3CircularProgressIndicator(
+                            size = AstroLoadingSize.LARGE,
+                            label = "Opening PDF reader...",
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        )
+                    }
                 }
                 renderError != null -> {
                     Card(
                         modifier = Modifier
                             .padding(24.dp)
-                            .fillMaxWidth(0.9f),
+                            .fillMaxWidth(0.9f)
+                            .align(Alignment.Center),
                         shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
                     ) {
                         Column(
@@ -289,7 +309,7 @@ fun PdfViewerScreen(
                                 text = renderError!!,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                textAlign = TextAlign.Center
                             )
 
                             Row(
@@ -301,19 +321,14 @@ fun PdfViewerScreen(
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(12.dp)
                                 ) {
-                                    Text("Back")
+                                    Text("Go Back")
                                 }
-
                                 Button(
                                     onClick = { reloadTrigger++ },
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(12.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Refresh,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                                    Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text("Retry")
                                 }
@@ -322,191 +337,240 @@ fun PdfViewerScreen(
                     }
                 }
                 else -> {
-                    // Reader View with Pinch and Pan Transformations
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(Unit) {
-                                detectTransformGestures { _, pan, zoom, _ ->
-                                    val newScale = (scale * zoom).coerceIn(1f, 4f)
-                                    scale = newScale
-                                    if (newScale > 1f) {
-                                        offsetX += pan.x
-                                        offsetY += pan.y
-                                    } else {
-                                        offsetX = 0f
-                                        offsetY = 0f
-                                    }
-                                }
-                            }
-                            .graphicsLayer(
-                                scaleX = scale,
-                                scaleY = scale,
-                                translationX = offsetX,
-                                translationY = offsetY
-                            )
+                    // Continuous Vertical Scroll inside Zoomable 2D Pan Box
+                    ZoomableBox(
+                        modifier = Modifier.fillMaxSize(),
+                        scale = scale,
+                        onScaleChanged = { scale = it }
                     ) {
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(top = 16.dp, bottom = 96.dp, start = 16.dp, end = 16.dp),
+                            contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp, start = 12.dp, end = 12.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            itemsIndexed(pdfPages) { pageIndex, bitmap ->
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = MaterialTheme.shapes.medium,
-                                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                                ) {
-                                    Image(
-                                        bitmap = bitmap.asImageBitmap(),
-                                        contentDescription = "PDF Page ${pageIndex + 1}",
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
+                            items(
+                                count = totalPages,
+                                key = { it }
+                            ) { pageIndex ->
+                                PdfPageView(
+                                    pageIndex = pageIndex,
+                                    engine = engine,
+                                    colorFilter = nightModeColorFilter
+                                )
                             }
                         }
                     }
 
-                    // Floating Zoom Controls Dock (Pill format)
+                    // Sticky Floating Current Page Badge (Top End)
                     Surface(
                         modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 16.dp, bottom = 84.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                            .align(Alignment.TopEnd)
+                            .padding(16.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
                         tonalElevation = 6.dp,
                         shadowElevation = 4.dp
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconButton(
-                                onClick = {
-                                    scale = (scale - 0.25f).coerceAtLeast(1f)
-                                    if (scale == 1f) {
-                                        offsetX = 0f
-                                        offsetY = 0f
-                                    }
-                                },
-                                enabled = scale > 1f,
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Remove,
-                                    contentDescription = "Zoom out",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-
-                            TextButton(
-                                onClick = {
-                                    scale = 1f
-                                    offsetX = 0f
-                                    offsetY = 0f
-                                },
-                                contentPadding = PaddingValues(horizontal = 8.dp),
-                                modifier = Modifier.height(36.dp)
-                            ) {
-                                Text(
-                                    text = "${(scale * 100).toInt()}%",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-
-                            IconButton(
-                                onClick = {
-                                    scale = (scale + 0.25f).coerceAtMost(4f)
-                                },
-                                enabled = scale < 4f,
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Add,
-                                    contentDescription = "Zoom in",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
+                            Text(
+                                text = "Page $currentPage / $totalPages",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
 
-                    // Bottom Page Scrubber Slider Dock
-                    if (totalPages > 1) {
+                    // Interactive Bottom Scrubber & Quick Zoom Dock
+                    AnimatedVisibility(
+                        visible = isScrubberVisible && totalPages > 0,
+                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, bottom = 20.dp)
+                    ) {
                         Surface(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(horizontal = 16.dp, vertical = 14.dp)
-                                .fillMaxWidth(0.92f),
-                            shape = CircleShape,
+                            shape = RoundedCornerShape(24.dp),
                             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
                             tonalElevation = 8.dp,
-                            shadowElevation = 6.dp
+                            shadowElevation = 6.dp,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Column(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                IconButton(
-                                    onClick = {
-                                        if (visibleItemIndex > 0) {
-                                            scope.launch {
-                                                listState.animateScrollToItem(visibleItemIndex - 1)
-                                            }
-                                        }
-                                    },
-                                    enabled = visibleItemIndex > 0,
-                                    modifier = Modifier.size(36.dp)
+                                // Scrubber Slider with Quick Jump
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                                        contentDescription = "Previous page",
-                                        modifier = Modifier.size(20.dp)
+                                    IconButton(
+                                        onClick = {
+                                            scope.launch {
+                                                val target = (currentPage - 2).coerceAtLeast(0)
+                                                listState.animateScrollToItem(target)
+                                            }
+                                        },
+                                        enabled = currentPage > 1,
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous Page")
+                                    }
+
+                                    var sliderValue by remember(currentPage) { mutableFloatStateOf(currentPage.toFloat()) }
+
+                                    Slider(
+                                        value = sliderValue,
+                                        onValueChange = { sliderValue = it },
+                                        onValueChangeFinished = {
+                                            val target = (sliderValue.roundToInt() - 1).coerceIn(0, totalPages - 1)
+                                            scope.launch {
+                                                listState.animateScrollToItem(target)
+                                            }
+                                        },
+                                        valueRange = 1f..totalPages.toFloat().coerceAtLeast(1f),
+                                        steps = (totalPages - 2).coerceAtLeast(0),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(horizontal = 8.dp)
+                                            .testTag("pdf_viewer_page_slider")
                                     )
+
+                                    IconButton(
+                                        onClick = {
+                                            scope.launch {
+                                                val target = currentPage.coerceAtMost(totalPages - 1)
+                                                listState.animateScrollToItem(target)
+                                            }
+                                        },
+                                        enabled = currentPage < totalPages,
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next Page")
+                                    }
                                 }
 
-                                Slider(
-                                    value = visibleItemIndex.toFloat(),
-                                    onValueChange = { pageIndex ->
-                                        scope.launch {
-                                            listState.scrollToItem(pageIndex.toInt())
-                                        }
-                                    },
-                                    valueRange = 0f..(totalPages - 1).toFloat(),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .padding(horizontal = 6.dp)
-                                )
-
-                                Text(
-                                    text = "${visibleItemIndex + 1}/$totalPages",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 4.dp)
-                                )
-
-                                IconButton(
-                                    onClick = {
-                                        if (visibleItemIndex < totalPages - 1) {
-                                            scope.launch {
-                                                listState.animateScrollToItem(visibleItemIndex + 1)
-                                            }
-                                        }
-                                    },
-                                    enabled = visibleItemIndex < totalPages - 1,
-                                    modifier = Modifier.size(36.dp)
+                                // Zoom Controls & Reset
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                        contentDescription = "Next page",
-                                        modifier = Modifier.size(20.dp)
+                                    Text(
+                                        text = "${(scale * 100).roundToInt()}% Zoom",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(
+                                            onClick = { scale = (scale - 0.25f).coerceAtLeast(1f) },
+                                            enabled = scale > 1f,
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(Icons.Outlined.Remove, contentDescription = "Zoom out", modifier = Modifier.size(16.dp))
+                                        }
+
+                                        TextButton(
+                                            onClick = { scale = 1f },
+                                            enabled = scale != 1f,
+                                            contentPadding = PaddingValues(horizontal = 8.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Text("Reset", style = MaterialTheme.typography.labelMedium)
+                                        }
+
+                                        IconButton(
+                                            onClick = { scale = (scale + 0.25f).coerceAtMost(4f) },
+                                            enabled = scale < 4f,
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(Icons.Outlined.Add, contentDescription = "Zoom in", modifier = Modifier.size(16.dp))
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    if (showThumbnailSheet) {
+        PdfThumbnailGridSheet(
+            engine = engine,
+            currentPage = currentPage,
+            onPageSelected = { targetPage ->
+                scope.launch {
+                    listState.animateScrollToItem(targetPage)
+                }
+            },
+            onDismiss = { showThumbnailSheet = false }
+        )
+    }
+}
+
+/**
+ * Renders an individual PDF page on-demand using the engine's LRU cache.
+ */
+@Composable
+private fun PdfPageView(
+    pageIndex: Int,
+    engine: PdfPageRendererEngine,
+    colorFilter: ColorFilter?
+) {
+    val context = LocalContext.current
+    val targetWidth = remember {
+        (context.resources.displayMetrics.widthPixels * 1.5f).toInt()
+    }
+
+    val pageBitmap by produceState<Bitmap?>(initialValue = null, pageIndex, engine) {
+        value = engine.renderPage(pageIndex, targetWidth)
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("pdf_page_card_$pageIndex"),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        if (pageBitmap != null) {
+            Image(
+                bitmap = pageBitmap!!.asImageBitmap(),
+                contentDescription = "PDF Page ${pageIndex + 1}",
+                colorFilter = colorFilter,
+                modifier = Modifier.fillMaxWidth()
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(0.72f)
+                    .background(Color.White),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(28.dp),
+                        strokeWidth = 3.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Page ${pageIndex + 1}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.DarkGray
+                    )
                 }
             }
         }

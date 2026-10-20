@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan to eliminate feed screen flashing during login and account setup, guarantee reliable Supabase cloud profile synchronization for onboarding and edits, and fix session persistence across logouts.",
-  "updatedAt": "2026-10-20T07:01:36.111873225Z",
+  "summary": "Implementation plan to overhaul the PDF research paper reader with on-demand asynchronous page rendering, bounded 2D free-pan and pinch-to-zoom (eliminating black screen voids), continuous vertical scroll, page scrubber slider, dark mode inversion, and thumbnail grid drawer.",
+  "updatedAt": "2026-10-20T08:09:40.157607064Z",
   "requestFeedback": true,
   "userFacing": true
 }
