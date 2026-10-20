@@ -6,11 +6,17 @@ import com.example.astroxplore.core.database.SettingsRepository
 import com.example.astroxplore.features.auth.data.AuthRepository
 import com.example.astroxplore.features.profile.data.ProfileRepository
 import com.example.astroxplore.features.profile.model.ProfileModel
+import com.example.astroxplore.core.network.NetworkConnectivityObserver
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.jsonPrimitive
 import java.util.Locale
@@ -20,11 +26,22 @@ import javax.inject.Inject
 class EditProfileViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
     private val authRepository: AuthRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val networkConnectivityObserver: NetworkConnectivityObserver
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<EditProfileUiState>(EditProfileUiState.Loading)
     val uiState = _uiState.asStateFlow()
+
+    private val _syncMessage = MutableSharedFlow<String>()
+    val syncMessage = _syncMessage.asSharedFlow()
+
+    val isOnline: StateFlow<Boolean> = networkConnectivityObserver.isConnected
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
 
     val countries = Locale.getISOCountries().map {
         val locale = Locale.Builder().setRegion(it).build()
@@ -155,9 +172,16 @@ class EditProfileViewModel @Inject constructor(
         _uiState.value = EditProfileUiState.Success(updatedProfile)
 
         viewModelScope.launch {
-            profileRepository.updateProfile(updatedProfile)
-            settingsRepository.setOnboardingComplete(true)
-            onSuccess?.invoke()
+            try {
+                profileRepository.updateProfile(updatedProfile)
+                settingsRepository.setOnboardingComplete(true)
+                _syncMessage.emit("Profile saved & synced to cloud")
+                onSuccess?.invoke()
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                _syncMessage.emit("Saved locally. Changes will sync when online.")
+                onSuccess?.invoke()
+            }
         }
     }
 }

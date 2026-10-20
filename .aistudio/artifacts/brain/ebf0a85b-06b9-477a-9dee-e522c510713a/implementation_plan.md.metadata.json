@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for separating first-launch App Feature Tour (cached locally in DataStore) from Post-Registration Academic Profile Setup, and fixing real-time profile editing sync so info is never lost or reset to empty.",
-  "updatedAt": "2026-10-20T05:01:23.395931426Z",
+  "summary": "Implementation plan to eliminate feed screen flashing during login and account setup, guarantee reliable Supabase cloud profile synchronization for onboarding and edits, and fix session persistence across logouts.",
+  "updatedAt": "2026-10-20T07:01:36.111873225Z",
   "requestFeedback": true,
   "userFacing": true
 }

@@ -90,6 +90,20 @@ class MainViewModel @Inject constructor(
                 if (status is SessionStatus.Authenticated) {
                     val userId = authRepository.currentUser?.id ?: ""
                     if (userId.isNotBlank()) {
+                        launch {
+                            profileRepository.getLocalProfile(userId).collect { localProf ->
+                                if (localProf != null) {
+                                    val isComplete = localProf.isOnboarded &&
+                                            !localProf.affiliationType.isNullOrBlank() &&
+                                            !localProf.country.isNullOrBlank() &&
+                                            !localProf.educationLevel.isNullOrBlank()
+                                    if (isComplete) {
+                                        _isOnboarded.value = true
+                                    }
+                                }
+                            }
+                        }
+
                         try {
                             val profile = kotlinx.coroutines.withTimeoutOrNull(4000L) {
                                 profileRepository.getProfile(userId)

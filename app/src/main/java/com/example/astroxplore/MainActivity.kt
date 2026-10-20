@@ -66,9 +66,11 @@ class MainActivity : ComponentActivity() {
 
             val isInitTimeout by mainViewModel.isInitTimeout.collectAsState()
 
-            // Keep splash screen visible until we have a determined session status, or 2s timeout elapses
+            val isOnboarded by mainViewModel.isOnboarded.collectAsState()
+
+            // Keep splash screen visible until we have a determined session status and onboarding status, or 2s timeout elapses
             splashScreen.setKeepOnScreenCondition {
-                sessionStatus == SessionStatus.Initializing && !isInitTimeout
+                (sessionStatus == SessionStatus.Initializing || (sessionStatus is SessionStatus.Authenticated && isOnboarded == null)) && !isInitTimeout
             }
 
             val themeMode by mainViewModel.themeMode.collectAsState()
@@ -114,8 +116,13 @@ fun AstroXploreMain(
     onScrollToTop: () -> Unit = {}
 ) {
     // Definitive readiness gate: wait until session is not Initializing,
-    // or if 2-second timeout elapsed (offline launch), immediately unblock.
-    val isReady = isInitTimeout || (sessionStatus !is SessionStatus.Initializing && isAppTourComplete != null)
+    // app tour state is known, and for authenticated users wait until onboarding status is resolved.
+    // This completely prevents the Feed screen from flashing before Onboarding.
+    val isReady = isInitTimeout || (
+        sessionStatus !is SessionStatus.Initializing &&
+        isAppTourComplete != null &&
+        (sessionStatus !is SessionStatus.Authenticated || isOnboarded != null)
+    )
 
     val startDestination = remember(isReady, sessionStatus, isAppTourComplete, isOnboarded) {
         if (!isReady) null

@@ -30,7 +30,9 @@ data class ProfileModel(
     @SerialName("is_onboarded")
     val isOnboarded: Boolean = false,
     @SerialName("created_at")
-    val createdAt: String? = null
+    val createdAt: String? = null,
+    @SerialName("updated_at")
+    val updatedAt: String? = null
 )
 
 @Serializable

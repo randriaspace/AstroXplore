@@ -16,7 +16,9 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -71,7 +73,7 @@ class ProfileRepository @Inject constructor(
                     isOnboarded = false
                 )
                 try {
-                    val payload = buildMap<String, Any> {
+                    val payload = buildJsonObject {
                         put("id", userId)
                         put("email", email)
                         put("full_name", fullName)
@@ -144,28 +146,36 @@ class ProfileRepository @Inject constructor(
     fun getCitationsTrackedCount(): Flow<Int> = savedPaperDao.getTotalCitationsTracked()
 
     suspend fun updateProfile(profile: ProfileModel) = withContext(Dispatchers.IO) {
-        profileDao.insertProfile(profile.toEntity(isSynced = false))
+        val currentUser = supabaseClient.auth.currentUserOrNull()
+        val verifiedEmail = currentUser?.email?.takeIf { it.isNotBlank() }
+            ?: profile.email.takeIf { it.isNotBlank() }
+            ?: ""
+        val safeProfile = profile.copy(email = verifiedEmail)
+
+        profileDao.insertProfile(safeProfile.toEntity(isSynced = false))
         
+        val payload = buildJsonObject {
+            put("id", safeProfile.id)
+            put("email", safeProfile.email)
+            safeProfile.fullName?.let { put("full_name", it) }
+            safeProfile.firstName?.let { put("first_name", it) }
+            safeProfile.lastName?.let { put("last_name", it) }
+            safeProfile.institution?.let { put("institution", it) }
+            safeProfile.affiliationType?.let { put("affiliation_type", it) }
+            safeProfile.affiliationName?.let { put("affiliation_name", it) }
+            safeProfile.country?.let { put("country", it) }
+            safeProfile.educationLevel?.let { put("education_level", it) }
+            safeProfile.orcidId?.let { put("orcid_id", it) }
+            put("is_onboarded", safeProfile.isOnboarded)
+        }
+
         try {
-            val payload = buildMap<String, Any> {
-                put("id", profile.id)
-                put("email", profile.email)
-                profile.fullName?.let { put("full_name", it) }
-                profile.firstName?.let { put("first_name", it) }
-                profile.lastName?.let { put("last_name", it) }
-                profile.institution?.let { put("institution", it) }
-                profile.affiliationType?.let { put("affiliation_type", it) }
-                profile.affiliationName?.let { put("affiliation_name", it) }
-                profile.country?.let { put("country", it) }
-                profile.educationLevel?.let { put("education_level", it) }
-                profile.orcidId?.let { put("orcid_id", it) }
-                put("is_onboarded", profile.isOnboarded)
-            }
             supabaseClient.postgrest["profiles"].upsert(payload)
-            profileDao.insertProfile(profile.toEntity(isSynced = true))
+            profileDao.insertProfile(safeProfile.toEntity(isSynced = true))
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             e.printStackTrace()
+            throw e
         }
     }
 
@@ -264,11 +274,12 @@ class ProfileRepository @Inject constructor(
             val profile = getProfile(userId)
             if (profile == null) {
                 val userEmail = supabaseClient.auth.currentUserOrNull()?.email ?: ""
-                supabaseClient.postgrest["profiles"].upsert(mapOf(
-                    "id" to userId,
-                    "email" to userEmail,
-                    "is_onboarded" to true
-                ))
+                val payload = buildJsonObject {
+                    put("id", userId)
+                    put("email", userEmail)
+                    put("is_onboarded", true)
+                }
+                supabaseClient.postgrest["profiles"].upsert(payload)
             } else {
                 supabaseClient.postgrest["profiles"].update({
                     set("is_onboarded", true)

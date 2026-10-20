@@ -13,6 +13,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.jsonPrimitive
 import java.util.Locale
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
@@ -124,11 +125,30 @@ class OnboardingViewModel @Inject constructor(
             try {
                 // Update profile with professional details
                 val currentProfile = profileRepository.getProfile(user.id)
-                val updatedProfile = (currentProfile ?: ProfileModel(id = user.id, email = user.email ?: "")).copy(
+                val metadata = user.userMetadata
+                val metadataMap = metadata?.entries?.associate { it.key to it.value.jsonPrimitive.content }
+                val firstNameFromMeta = metadataMap?.get("first_name")?.trim()
+                val lastNameFromMeta = metadataMap?.get("last_name")?.trim()
+                val fullNameFromMeta = metadataMap?.get("full_name")?.trim()
+
+                val baseProfile = currentProfile ?: ProfileModel(
+                    id = user.id,
+                    email = user.email ?: "",
+                    firstName = firstNameFromMeta,
+                    lastName = lastNameFromMeta,
+                    fullName = fullNameFromMeta ?: listOfNotNull(firstNameFromMeta, lastNameFromMeta).filter { it.isNotBlank() }.joinToString(" ").ifBlank { null }
+                )
+
+                val updatedProfile = baseProfile.copy(
+                    email = if (baseProfile.email.isNotBlank()) baseProfile.email else (user.email ?: ""),
+                    firstName = baseProfile.firstName ?: firstNameFromMeta,
+                    lastName = baseProfile.lastName ?: lastNameFromMeta,
+                    fullName = baseProfile.fullName ?: fullNameFromMeta,
                     affiliationType = affiliationType,
                     affiliationName = affiliationName,
                     country = country,
                     educationLevel = educationLevel,
+                    institution = affiliationName ?: baseProfile.institution,
                     orcidId = orcidId,
                     isOnboarded = true
                 )
