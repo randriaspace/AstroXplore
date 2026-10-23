@@ -42,10 +42,14 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.astroxplore.core.ui.components.AstroLoadingSize
 import com.example.astroxplore.core.ui.components.AstroM3LoadingIndicator
+import com.example.astroxplore.core.util.CalendarSyncUtils
+import com.example.astroxplore.core.util.MeetingFrequency
 import com.example.astroxplore.core.util.QrCodeUtils
 import com.example.astroxplore.features.groups.model.*
 import com.example.astroxplore.features.groups.ui.components.*
 import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -76,6 +80,8 @@ fun GroupDetailsScreen(
     var archivePassword by remember { mutableStateOf("") }
     var showScheduleSheet by remember { mutableStateOf(false) }
     var showReviewSheet by remember { mutableStateOf(false) }
+    var showCalendarSyncSheet by remember { mutableStateOf(false) }
+    var syncPresentationTarget by remember { mutableStateOf<PresentationModel?>(null) }
     var selectedBibcodeForSchedule by remember { mutableStateOf<String?>(null) }
     var selectedTitleForSchedule by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -83,6 +89,10 @@ fun GroupDetailsScreen(
 
     BackHandler {
         when {
+            showCalendarSyncSheet -> {
+                showCalendarSyncSheet = false
+                syncPresentationTarget = null
+            }
             showSettingsScreen -> showSettingsScreen = false
             showAddPaperSheet -> showAddPaperSheet = false
             showDeleteDialog -> showDeleteDialog = false
@@ -193,9 +203,8 @@ fun GroupDetailsScreen(
                 onInviteClick = viewModel::createInvite,
                 onEditClick = { showSettingsScreen = true },
                 onSyncCalendarClick = {
-                    group?.let { g ->
-                        syncGroupToCalendar(context, g)
-                    }
+                    syncPresentationTarget = null
+                    showCalendarSyncSheet = true
                 }
             )
         },
@@ -204,9 +213,8 @@ fun GroupDetailsScreen(
                 onNominateClick = { showAddPaperSheet = true },
                 onVoteAgendaClick = { selectedTabIndex = 1 },
                 onCalendarRsvpClick = {
-                    group?.let { g ->
-                        syncGroupToCalendar(context, g)
-                    }
+                    syncPresentationTarget = null
+                    showCalendarSyncSheet = true
                 }
             )
         }
@@ -286,7 +294,11 @@ fun GroupDetailsScreen(
                             },
                             onAddReviewClick = { showReviewSheet = true },
                             onCheckIn = { presentationId -> viewModel.checkInSession(presentationId) },
-                            onPaperClick = onPaperClick
+                            onPaperClick = onPaperClick,
+                            onSyncCalendar = { presentation ->
+                                syncPresentationTarget = presentation
+                                showCalendarSyncSheet = true
+                            }
                         )
                     }
                     3 -> KpiTab(
@@ -350,9 +362,41 @@ fun GroupDetailsScreen(
             bibcode = selectedBibcodeForSchedule!!,
             paperTitle = selectedTitleForSchedule,
             onDismiss = { showScheduleSheet = false },
-            onSchedule = { dateTime, loc ->
+            onSchedule = { dateTime, loc, autoSyncCalendar, frequency ->
                 viewModel.schedulePresentation(selectedBibcodeForSchedule!!, selectedTitleForSchedule, dateTime, loc)
                 showScheduleSheet = false
+                if (autoSyncCalendar && group != null) {
+                    val fakePresentation = PresentationModel(
+                        groupId = group!!.id,
+                        presenterId = currentUserId ?: "user",
+                        bibcode = selectedBibcodeForSchedule!!,
+                        paperTitle = selectedTitleForSchedule,
+                        scheduledAt = dateTime.toString(),
+                        meetingLocation = loc
+                    )
+                    try {
+                        val intent = CalendarSyncUtils.buildCalendarIntent(
+                            group = group!!,
+                            presentation = fakePresentation,
+                            startTime = dateTime.atZone(ZoneId.systemDefault()),
+                            frequency = frequency
+                        )
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        )
+    }
+
+    if (showCalendarSyncSheet && group != null) {
+        CalendarSyncBottomSheet(
+            group = group!!,
+            presentation = syncPresentationTarget,
+            onDismiss = {
+                showCalendarSyncSheet = false
+                syncPresentationTarget = null
             }
         )
     }
@@ -677,7 +721,8 @@ fun SessionsTab(
     onScheduleClick: () -> Unit,
     onAddReviewClick: () -> Unit,
     onCheckIn: (String) -> Unit,
-    onPaperClick: (String) -> Unit
+    onPaperClick: (String) -> Unit,
+    onSyncCalendar: (PresentationModel?) -> Unit = {}
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -703,14 +748,26 @@ fun SessionsTab(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Button(
-                    onClick = onScheduleClick,
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Schedule Talk", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(
+                        onClick = { onSyncCalendar(null) },
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Outlined.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Sync", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = onScheduleClick,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Schedule Talk", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -752,7 +809,8 @@ fun SessionsTab(
                 TimelinePresentationCard(
                     presentation = presentation,
                     onCheckIn = { onCheckIn(presentation.id ?: "") },
-                    onPaperClick = { onPaperClick(presentation.bibcode) }
+                    onPaperClick = { onPaperClick(presentation.bibcode) },
+                    onSyncCalendar = { onSyncCalendar(presentation) }
                 )
             }
         }
@@ -827,7 +885,8 @@ fun SessionsTab(
 fun TimelinePresentationCard(
     presentation: PresentationModel,
     onCheckIn: () -> Unit,
-    onPaperClick: () -> Unit
+    onPaperClick: () -> Unit,
+    onSyncCalendar: () -> Unit = {}
 ) {
     var checkedIn by remember(presentation.isCheckedIn) { mutableStateOf(presentation.isCheckedIn) }
 
@@ -924,17 +983,29 @@ fun TimelinePresentationCard(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedButton(
                     onClick = onPaperClick,
                     shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(15.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Read Preprint", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Preprint", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+
+                FilledTonalButton(
+                    onClick = onSyncCalendar,
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Outlined.CalendarMonth, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Sync", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
 
                 FilledTonalButton(
@@ -942,21 +1013,22 @@ fun TimelinePresentationCard(
                         checkedIn = !checkedIn
                         if (checkedIn) onCheckIn()
                     },
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = if (checkedIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp),
                         contentColor = if (checkedIn) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                     ),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.weight(1.1f)
                 ) {
                     Icon(
                         imageVector = if (checkedIn) Icons.Default.CheckCircle else Icons.Default.AddCircleOutline,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(15.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        if (checkedIn) "RSVP Confirmed" else "RSVP / Check In",
+                        if (checkedIn) "Attending" else "RSVP",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -1808,12 +1880,25 @@ fun SchedulePresentationSheet(
     bibcode: String,
     paperTitle: String?,
     onDismiss: () -> Unit,
-    onSchedule: (LocalDateTime, String) -> Unit
+    onSchedule: (LocalDateTime, String, Boolean, MeetingFrequency) -> Unit
 ) {
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = System.currentTimeMillis() + 2 * 24 * 60 * 60 * 1000L
     )
+    var selectedHour by remember { mutableIntStateOf(17) }
+    var selectedMinute by remember { mutableIntStateOf(0) }
+    var selectedFrequency by remember { mutableStateOf(MeetingFrequency.ONE_TIME) }
+    var autoSyncCalendar by remember { mutableStateOf(true) }
     var location by remember { mutableStateOf("Google Meet: meet.google.com/ast-jnl-club") }
+
+    val presetTimes = listOf(
+        Pair(10, 0),
+        Pair(14, 0),
+        Pair(16, 0),
+        Pair(17, 0),
+        Pair(18, 0),
+        Pair(20, 0)
+    )
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -1822,7 +1907,7 @@ fun SchedulePresentationSheet(
                 .padding(24.dp)
                 .verticalScroll(rememberScrollState())
                 .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text("Schedule Seminar Talk", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
             Text(
@@ -1832,32 +1917,161 @@ fun SchedulePresentationSheet(
                 color = MaterialTheme.colorScheme.primary
             )
 
-            DatePicker(
-                state = datePickerState,
-                modifier = Modifier.fillMaxWidth()
-            )
+            // Date Picker Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Text(
+                        text = "Select Seminar Date",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                    DatePicker(
+                        state = datePickerState,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            // Time Selector
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Meeting Time (UTC)",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            text = String.format("%02d:%02d UTC", selectedHour, selectedMinute),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    presetTimes.forEach { (h, m) ->
+                        val isSelected = selectedHour == h && selectedMinute == m
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = {
+                                selectedHour = h
+                                selectedMinute = m
+                            },
+                            label = { Text(String.format("%02d:%02d", h, m), fontSize = 12.sp) }
+                        )
+                    }
+                }
+            }
+
+            // Recurrence Frequency
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Seminar Cadence / Recurrence",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    MeetingFrequency.entries.forEach { freq ->
+                        val isSelected = selectedFrequency == freq
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { selectedFrequency = freq },
+                            label = {
+                                Text(
+                                    text = when (freq) {
+                                        MeetingFrequency.ONE_TIME -> "One-time"
+                                        MeetingFrequency.WEEKLY -> "Weekly"
+                                        MeetingFrequency.BIWEEKLY -> "Bi-weekly"
+                                        MeetingFrequency.MONTHLY -> "Monthly"
+                                    },
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        )
+                    }
+                }
+            }
 
             OutlinedTextField(
                 value = location,
                 onValueChange = { location = it },
-                label = { Text("Meeting Venue or Link") },
+                label = { Text("Meeting Venue or Video Call Link") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
+
+            // Auto-sync calendar toggle
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.CalendarMonth,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Column {
+                            Text("Sync to Calendar", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                            Text("Prompt device calendar after scheduling", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Switch(
+                        checked = autoSyncCalendar,
+                        onCheckedChange = { autoSyncCalendar = it }
+                    )
+                }
+            }
 
             Button(
                 onClick = {
                     val selectedDateMillis = datePickerState.selectedDateMillis ?: System.currentTimeMillis()
                     val selectedDate = java.time.Instant.ofEpochMilli(selectedDateMillis)
-                        .atZone(java.time.ZoneId.systemDefault())
+                        .atZone(ZoneId.systemDefault())
                         .toLocalDate()
-                    val selectedDateTime = LocalDateTime.of(selectedDate, java.time.LocalTime.of(17, 0))
-                    onSchedule(selectedDateTime, location.trim())
+                    val selectedDateTime = LocalDateTime.of(selectedDate, LocalTime.of(selectedHour, selectedMinute))
+                    onSchedule(selectedDateTime, location.trim(), autoSyncCalendar, selectedFrequency)
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(14.dp)
             ) {
-                Text("Confirm Seminar Date", fontWeight = FontWeight.Bold)
+                Icon(Icons.Default.EventAvailable, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Confirm Seminar Schedule", fontWeight = FontWeight.Bold)
             }
 
             Spacer(modifier = Modifier.height(16.dp))

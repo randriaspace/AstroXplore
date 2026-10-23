@@ -223,11 +223,39 @@ fun GroupSettingsScreen(
                     OutlinedTextField(
                         value = schedule,
                         onValueChange = { schedule = it },
-                        label = { Text("Meeting Schedule (e.g. Weekly on Thu at 4:00 PM)") },
+                        label = { Text("Meeting Schedule (e.g. Weekly on Thu at 17:00 UTC)") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         enabled = isOwnerOrAdmin && isOnline
                     )
+
+                    // Cadence Presets Chips
+                    if (isOwnerOrAdmin && isOnline) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "Standard Cadence Presets (Auto-Syncs with Calendar):",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                val presets = listOf(
+                                    "Weekly on Thu at 17:00 UTC" to "Weekly Thu",
+                                    "Bi-weekly on Wed at 16:00 UTC" to "Bi-weekly Wed",
+                                    "Monthly on 1st Fri at 18:00 UTC" to "Monthly Fri"
+                                )
+                                presets.forEach { (fullSched, chipLabel) ->
+                                    SuggestionChip(
+                                        onClick = { schedule = fullSched },
+                                        label = { Text(chipLabel, fontSize = 11.sp) }
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     OutlinedTextField(
                         value = location,
