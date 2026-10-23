@@ -64,13 +64,18 @@ fun ProfileScreen(
         )
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .widthIn(max = 840.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
         Text(
             text = stringResource(R.string.settings),
             style = MaterialTheme.typography.titleLarge,
@@ -206,6 +211,7 @@ fun ProfileScreen(
         )
 
         Spacer(modifier = Modifier.height(32.dp))
+    }
     }
 }
 

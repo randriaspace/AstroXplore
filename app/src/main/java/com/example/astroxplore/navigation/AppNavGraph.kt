@@ -10,16 +10,23 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Explore
@@ -36,6 +43,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -141,18 +151,31 @@ fun RootNavHost(
         }
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            if (showBottomNav) {
-                BottomNavigationBar(
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val isExpandedScreen = maxWidth >= 600.dp
+
+        Row(modifier = Modifier.fillMaxSize()) {
+            if (showBottomNav && isExpandedScreen) {
+                AppNavigationRail(
                     navController = navController,
                     onScrollToTop = onScrollToTop
                 )
             }
-        },
-        modifier = modifier
-    ) { innerPadding ->
+
+            Scaffold(
+                containerColor = MaterialTheme.colorScheme.background,
+                bottomBar = {
+                    if (showBottomNav && !isExpandedScreen) {
+                        BottomNavigationBar(
+                            navController = navController,
+                            onScrollToTop = onScrollToTop
+                        )
+                    }
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+            ) { innerPadding ->
         NavHost(
             navController = navController,
             startDestination = startDestination,
@@ -384,6 +407,8 @@ fun RootNavHost(
         }
     }
 }
+}
+}
 
 /**
  * Bottom Navigation Bar Component
@@ -489,3 +514,106 @@ data class NavBarItem(
     val filledIcon: ImageVector,
     val outlinedIcon: ImageVector
 )
+
+/**
+ * Tablet & Foldable Side Navigation Rail Component
+ */
+@Composable
+fun AppNavigationRail(
+    navController: NavController,
+    onScrollToTop: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+
+    val items = listOf(
+        NavBarItem("feed", "Feed", Icons.Filled.Newspaper, Icons.Outlined.Newspaper),
+        NavBarItem("groups", "Clubs", Icons.Filled.Groups, Icons.Outlined.Groups),
+        NavBarItem("explore", "Explore", Icons.Filled.Explore, Icons.Outlined.Explore),
+        NavBarItem("library", "Library", Icons.Filled.Bookmark, Icons.Outlined.BookmarkBorder),
+        NavBarItem("profile", "Profile", Icons.Filled.Person, Icons.Outlined.Person)
+    )
+
+    val currentTab = when {
+        currentDestination?.hasRoute<Screen.Feed>() == true -> "feed"
+        currentDestination?.hasRoute<Screen.Groups>() == true -> "groups"
+        currentDestination?.hasRoute<Screen.Explore>() == true -> "explore"
+        currentDestination?.hasRoute<Screen.Library>() == true -> "library"
+        currentDestination?.hasRoute<Screen.Profile>() == true -> "profile"
+        else -> "feed"
+    }
+
+    NavigationRail(
+        modifier = modifier.windowInsetsPadding(WindowInsets.statusBars),
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        header = {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier
+                    .padding(vertical = 16.dp)
+                    .size(44.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Newspaper,
+                        contentDescription = "AstroXplore",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+        }
+    ) {
+        items.forEach { item ->
+            val isSelected = currentTab == item.route
+            NavigationRailItem(
+                selected = isSelected,
+                onClick = {
+                    if (isSelected) {
+                        if (item.route == "feed") {
+                            onScrollToTop()
+                        }
+                    } else {
+                        val tabOptions: NavOptionsBuilder.() -> Unit = {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                                inclusive = false
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                        when (item.route) {
+                            "feed" -> navController.navigate(Screen.Feed, tabOptions)
+                            "groups" -> navController.navigate(Screen.Groups, tabOptions)
+                            "explore" -> navController.navigate(Screen.Explore(), tabOptions)
+                            "library" -> navController.navigate(Screen.Library, tabOptions)
+                            "profile" -> navController.navigate(Screen.Profile, tabOptions)
+                        }
+                    }
+                },
+                icon = {
+                    Icon(
+                        imageVector = if (isSelected) item.filledIcon else item.outlinedIcon,
+                        contentDescription = item.label
+                    )
+                },
+                label = {
+                    Text(
+                        text = item.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                    )
+                },
+                colors = NavigationRailItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            )
+        }
+    }
+}

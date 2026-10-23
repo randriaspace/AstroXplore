@@ -47,23 +47,23 @@ private val tourPages = listOf(
     TourPageData(
         icon = Icons.Default.Explore,
         badge = "DAILY PREPRINTS",
-        title = "Explore the Cosmic Frontier",
-        description = "Stay at the forefront of space research with streaming arXiv preprints, AI-generated research briefings, and citation tracking tailored to your scientific focus.",
-        featurePills = listOf("arXiv Realtime", "AI Briefings", "Citation Metrics")
+        title = "Discover Astrophysics Research",
+        description = "Stay up to date with new astrophysics papers, research briefings, and citation metrics tailored to your scientific focus.",
+        featurePills = listOf("arXiv Papers", "Research Briefings", "Citation Metrics")
     ),
     TourPageData(
         icon = Icons.Default.Groups,
         badge = "PEER COLLABORATION",
-        title = "Debate & Review Together",
-        description = "Form specialized journal clubs, create research circles, vote on breakthrough preprints with consensus mechanisms, and share insights with astrophysicists worldwide.",
-        featurePills = listOf("Journal Circles", "Consensus Voting", "QR Group Join")
+        title = "Discuss Papers with Peers",
+        description = "Form journal clubs, discuss papers with research colleagues, vote on breakthrough preprints, and share reading lists.",
+        featurePills = listOf("Journal Clubs", "Paper Voting", "Direct Sharing")
     ),
     TourPageData(
         icon = Icons.Default.School,
         badge = "ACADEMIC EXCELLENCE",
-        title = "Your Personal Scholar Hub",
-        description = "Curate personalized reading lists, read PDFs offline with zero latency, connect your ORCID credentials, and showcase your institutional affiliation.",
-        featurePills = listOf("Offline PDFs", "ORCID Integration", "Custom Topics")
+        title = "Your Personal Research Library",
+        description = "Curate personalized reading lists, read papers offline in our high-speed viewer, connect your ORCID record, and track your institutional profile.",
+        featurePills = listOf("Offline PDF Viewer", "ORCID Record", "Reading Lists")
     )
 )
 

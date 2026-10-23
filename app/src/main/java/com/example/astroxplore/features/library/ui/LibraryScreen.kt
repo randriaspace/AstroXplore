@@ -97,7 +97,7 @@ fun LibraryScreen(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "Personal Archive",
+                                text = "Library",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = (-0.5).sp
@@ -278,60 +278,69 @@ fun LibraryScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            if (isRefreshing && papers.isEmpty()) {
-                Column(
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(top = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                        .fillMaxHeight()
+                        .widthIn(max = 840.dp)
                 ) {
-                    repeat(4) {
-                        AstroPaperCardSkeleton()
-                    }
-                }
-            } else if (papers.isEmpty()) {
-                EmptyLibraryState(
-                    onExploreClick = onExploreClick,
-                    onSyncClick = { viewModel.syncLibrary() }
-                )
-            } else if (filteredPapers.isEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.FilterAltOff,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "No matching papers",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Try clearing your search or switching filter tabs.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    TextButton(onClick = {
-                        searchQuery = ""
-                        selectedFilter = LibraryFilter.ALL
-                    }) {
-                        Text("Reset Filters")
-                    }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 4.dp, bottom = 96.dp)
-                ) {
+                    if (isRefreshing && papers.isEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(top = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            repeat(4) {
+                                AstroPaperCardSkeleton()
+                            }
+                        }
+                    } else if (papers.isEmpty()) {
+                        EmptyLibraryState(
+                            onExploreClick = onExploreClick,
+                            onSyncClick = { viewModel.syncLibrary() }
+                        )
+                    } else if (filteredPapers.isEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.FilterAltOff,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "No matching papers",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Try clearing your search or switching filter tabs.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            TextButton(onClick = {
+                                searchQuery = ""
+                                selectedFilter = LibraryFilter.ALL
+                            }) {
+                                Text("Reset Filters")
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(top = 4.dp, bottom = 96.dp)
+                        ) {
                     // Shelf Summary Metrics Card
                     item {
                         Card(
@@ -410,6 +419,8 @@ fun LibraryScreen(
                 }
             }
         }
+    }
+}
 
         // Confirmation Pop-up Dialog for Removing / Archiving
         paperToConfirmRemove?.let { paper ->
@@ -773,7 +784,7 @@ fun EmptyLibraryState(
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "Your Academic Shelf is Empty",
+            text = "No Saved Papers Yet",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
@@ -782,7 +793,7 @@ fun EmptyLibraryState(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Papers you bookmark from the research feed or discovery queries are preserved here for offline reading, quick citations, and journal club discussions.",
+            text = "Papers you save from the research feed or search queries will appear here for offline reading, quick citations, and journal clubs.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

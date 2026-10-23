@@ -366,10 +366,10 @@ fun PaperCard(
 }
 
 @Composable
-fun PaperCardSkeleton() {
-    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-        com.example.astroxplore.features.feed.ui.components.CosmicShimmerPaperCard()
-    }
+fun PaperCardSkeleton(
+    modifier: Modifier = Modifier
+) {
+    PaperCardShimmer(modifier = modifier)
 }
 
 @Composable

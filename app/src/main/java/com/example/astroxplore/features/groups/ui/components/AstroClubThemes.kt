@@ -35,20 +35,20 @@ object AstroClubThemes {
     )
 
     val availableColors = listOf(
-        Triple("Cosmic Blue", Color(0xFF1E88E5), Color(0xFF0D47A1)),
-        Triple("Nebula Violet", Color(0xFF7C4DFF), Color(0xFF4A148C)),
-        Triple("Supernova Amber", Color(0xFFF57C00), Color(0xFFE65100)),
-        Triple("Aurora Teal", Color(0xFF00897B), Color(0xFF004D40)),
-        Triple("Pulsar Crimson", Color(0xFFE53935), Color(0xFFB71C1C)),
-        Triple("Celestial Cyan", Color(0xFF00ACC1), Color(0xFF006064)),
-        Triple("Indigo Deep", Color(0xFF3F51B5), Color(0xFF1A237E)),
-        Triple("Pink Nova", Color(0xFFD81B60), Color(0xFF880E4F))
+        Triple("Deep Blue", Color(0xFF1E88E5), Color(0xFF0D47A1)),
+        Triple("Royal Violet", Color(0xFF7C4DFF), Color(0xFF4A148C)),
+        Triple("Amber", Color(0xFFF57C00), Color(0xFFE65100)),
+        Triple("Emerald Teal", Color(0xFF00897B), Color(0xFF004D40)),
+        Triple("Crimson", Color(0xFFE53935), Color(0xFFB71C1C)),
+        Triple("Cyan", Color(0xFF00ACC1), Color(0xFF006064)),
+        Triple("Deep Indigo", Color(0xFF3F51B5), Color(0xFF1A237E)),
+        Triple("Rose", Color(0xFFD81B60), Color(0xFF880E4F))
     )
 
     val options = listOf(
         AstroClubTheme(
             id = "deep_space",
-            name = "Cosmic Blue",
+            name = "Deep Blue",
             primaryColor = Color(0xFF1E88E5),
             containerColor = Color(0xFF1E88E5).copy(alpha = 0.14f),
             onContainerColor = Color(0xFF0D47A1),
@@ -58,53 +58,53 @@ object AstroClubThemes {
         ),
         AstroClubTheme(
             id = "nebula",
-            name = "Nebula Violet",
+            name = "Royal Violet",
             primaryColor = Color(0xFF7C4DFF),
             containerColor = Color(0xFF7C4DFF).copy(alpha = 0.14f),
             onContainerColor = Color(0xFF4A148C),
             icon = Icons.Default.AutoAwesome,
             iconName = "Galaxy",
-            tagLine = "Deep-space Nebulae & Cosmic Structures"
+            tagLine = "Galaxies & Interstellar Medium"
         ),
         AstroClubTheme(
             id = "supernova",
-            name = "Supernova Amber",
+            name = "Amber",
             primaryColor = Color(0xFFF57C00),
             containerColor = Color(0xFFF57C00).copy(alpha = 0.14f),
             onContainerColor = Color(0xFFE65100),
             icon = Icons.Default.Star,
             iconName = "Supernova",
-            tagLine = "Stellar Transients & High Energy"
+            tagLine = "Stellar Physics & Transients"
         ),
         AstroClubTheme(
             id = "aurora",
-            name = "Aurora Teal",
+            name = "Emerald Teal",
             primaryColor = Color(0xFF00897B),
             containerColor = Color(0xFF00897B).copy(alpha = 0.14f),
             onContainerColor = Color(0xFF004D40),
             icon = Icons.Default.SettingsInputAntenna,
             iconName = "Observatory",
-            tagLine = "Radio Astronomy & Cosmic Telescopy"
+            tagLine = "Radio Astronomy & Observatories"
         ),
         AstroClubTheme(
             id = "pulsar",
-            name = "Pulsar Crimson",
+            name = "Crimson",
             primaryColor = Color(0xFFE53935),
             containerColor = Color(0xFFE53935).copy(alpha = 0.14f),
             onContainerColor = Color(0xFFB71C1C),
             icon = Icons.Default.HowToVote,
             iconName = "Consensus",
-            tagLine = "Gravitational Waves & Relativity"
+            tagLine = "Gravitational Waves & Cosmology"
         ),
         AstroClubTheme(
             id = "celestial",
-            name = "Celestial Cyan",
+            name = "Cyan",
             primaryColor = Color(0xFF00ACC1),
             containerColor = Color(0xFF00ACC1).copy(alpha = 0.14f),
             onContainerColor = Color(0xFF006064),
             icon = Icons.Default.Bookmark,
             iconName = "Archive",
-            tagLine = "Exoplanet Atmospheres & Cosmology"
+            tagLine = "Exoplanetary Atmospheres"
         )
     )
 

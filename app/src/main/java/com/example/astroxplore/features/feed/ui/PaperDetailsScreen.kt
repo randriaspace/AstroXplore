@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -96,130 +97,153 @@ fun PaperDetailsScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Publication",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                windowInsets = WindowInsets(0.dp),
-                navigationIcon = {
-                    IconButton(
-                        onClick = onNavigateBack,
-                        modifier = Modifier.testTag("paper_details_back_button")
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    if (uiState is PaperDetailsUiState.Success) {
-                        val paper = (uiState as PaperDetailsUiState.Success).paper
-                        IconButton(
-                            onClick = { viewModel.toggleSave(paper) },
-                            modifier = Modifier.testTag("paper_details_bookmark_button")
-                        ) {
-                            Icon(
-                                imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
-                                contentDescription = if (isSaved) "Remove from library" else "Save to library",
-                                tint = if (isSaved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(modifier = Modifier.widthIn(max = 840.dp)) {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                text = "Publication",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
                             )
-                        }
-                    }
-                    IconButton(
-                        onClick = {
-                            val sendIntent = Intent().apply {
-                                action = Intent.ACTION_SEND
-                                putExtra(
-                                    Intent.EXTRA_TEXT,
-                                    "Check out this paper: $bibcode\nhttps://ui.adsabs.harvard.edu/abs/$bibcode"
-                                )
-                                type = "text/plain"
-                            }
-                            context.startActivity(Intent.createChooser(sendIntent, null))
                         },
-                        modifier = Modifier.testTag("paper_details_share_button")
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = "Share")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
-            )
+                        windowInsets = WindowInsets(0.dp),
+                        navigationIcon = {
+                            IconButton(
+                                onClick = onNavigateBack,
+                                modifier = Modifier.testTag("paper_details_back_button")
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            }
+                        },
+                        actions = {
+                            if (uiState is PaperDetailsUiState.Success) {
+                                val paper = (uiState as PaperDetailsUiState.Success).paper
+                                IconButton(
+                                    onClick = { viewModel.toggleSave(paper) },
+                                    modifier = Modifier.testTag("paper_details_bookmark_button")
+                                ) {
+                                    Icon(
+                                        imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                                        contentDescription = if (isSaved) "Remove from library" else "Save to library",
+                                        tint = if (isSaved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                            IconButton(
+                                onClick = {
+                                    val sendIntent = Intent().apply {
+                                        action = Intent.ACTION_SEND
+                                        putExtra(
+                                            Intent.EXTRA_TEXT,
+                                            "Check out this paper: $bibcode\nhttps://ui.adsabs.harvard.edu/abs/$bibcode"
+                                        )
+                                        type = "text/plain"
+                                    }
+                                    context.startActivity(Intent.createChooser(sendIntent, null))
+                                },
+                                modifier = Modifier.testTag("paper_details_share_button")
+                            ) {
+                                Icon(Icons.Default.Share, contentDescription = "Share")
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            titleContentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    )
+                }
+            }
         },
         bottomBar = {
             if (uiState is PaperDetailsUiState.Success) {
                 val paper = (uiState as PaperDetailsUiState.Success).paper
                 val hasPdfUrl = !paper.pdfUrl.isNullOrBlank()
 
-                PrimaryActionDock(
-                    onReadPdfClick = {
-                        val localFile = if (!localFilePath.isNullOrBlank()) {
-                            File(localFilePath!!)
-                        } else {
-                            File(context.filesDir, "pdfs/${paper.bibcode}.pdf")
-                        }
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(modifier = Modifier.widthIn(max = 840.dp)) {
+                        PrimaryActionDock(
+                            onReadPdfClick = {
+                                val localFile = if (!localFilePath.isNullOrBlank()) {
+                                    File(localFilePath!!)
+                                } else {
+                                    File(context.filesDir, "pdfs/${paper.bibcode}.pdf")
+                                }
 
-                        if (localFile.exists()) {
-                            onReadPdfClick(paper.bibcode, localFile.absolutePath, paper.title)
-                        } else if (hasPdfUrl) {
-                            userInitiatedDownload = true
-                            viewModel.downloadPaperPdf(context, paper)
-                        } else {
-                            // Direct user to external publisher / NASA ADS link
-                            val url = "https://ui.adsabs.harvard.edu/abs/${paper.bibcode}"
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                            context.startActivity(intent)
-                        }
-                    },
-                    onSecondaryActionClick = { showGroupPicker = true },
-                    downloadState = downloadState,
-                    downloadProgress = downloadProgress,
-                    hasPdfUrl = hasPdfUrl,
-                    secondaryButtonText = "Journal Club",
-                    secondaryButtonIcon = Icons.Outlined.Groups
-                )
+                                if (localFile.exists()) {
+                                    onReadPdfClick(paper.bibcode, localFile.absolutePath, paper.title)
+                                } else if (hasPdfUrl) {
+                                    userInitiatedDownload = true
+                                    viewModel.downloadPaperPdf(context, paper)
+                                } else {
+                                    // Direct user to external publisher / NASA ADS link
+                                    val url = "https://ui.adsabs.harvard.edu/abs/${paper.bibcode}"
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                    context.startActivity(intent)
+                                }
+                            },
+                            onSecondaryActionClick = { showGroupPicker = true },
+                            downloadState = downloadState,
+                            downloadProgress = downloadProgress,
+                            hasPdfUrl = hasPdfUrl,
+                            secondaryButtonText = "Journal Club",
+                            secondaryButtonIcon = Icons.Outlined.Groups
+                        )
+                    }
+                }
             }
         }
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(innerPadding),
+            contentAlignment = Alignment.TopCenter
         ) {
-            when (val state = uiState) {
-                is PaperDetailsUiState.Loading -> {
-                    AstroDetailsSkeleton()
-                }
-                is PaperDetailsUiState.Success -> {
-                    PaperDetailsMainContent(
-                        paper = state.paper,
-                        onCopyBibTeX = { bibtex ->
-                            scope.launch {
-                                clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("BibTeX", bibtex)))
-                                snackbarHostState.showSnackbar("BibTeX copied to clipboard")
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .widthIn(max = 840.dp)
+            ) {
+                when (val state = uiState) {
+                    is PaperDetailsUiState.Loading -> {
+                        AstroDetailsSkeleton()
+                    }
+                    is PaperDetailsUiState.Success -> {
+                        PaperDetailsMainContent(
+                            paper = state.paper,
+                            onCopyBibTeX = { bibtex ->
+                                scope.launch {
+                                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("BibTeX", bibtex)))
+                                    snackbarHostState.showSnackbar("BibTeX copied to clipboard")
+                                }
+                            },
+                            onShareBibTeX = { bibtex ->
+                                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_SUBJECT, "BibTeX: ${state.paper.title}")
+                                    putExtra(Intent.EXTRA_TEXT, bibtex)
+                                }
+                                context.startActivity(Intent.createChooser(sendIntent, "Export BibTeX"))
+                            },
+                            onOpenAds = {
+                                val url = "https://ui.adsabs.harvard.edu/abs/${state.paper.bibcode}"
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                             }
-                        },
-                        onShareBibTeX = { bibtex ->
-                            val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(Intent.EXTRA_SUBJECT, "BibTeX: ${state.paper.title}")
-                                putExtra(Intent.EXTRA_TEXT, bibtex)
-                            }
-                            context.startActivity(Intent.createChooser(sendIntent, "Export BibTeX"))
-                        },
-                        onOpenAds = {
-                            val url = "https://ui.adsabs.harvard.edu/abs/${state.paper.bibcode}"
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        )
+                    }
+                    is PaperDetailsUiState.Error -> {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(state.message, color = MaterialTheme.colorScheme.error)
                         }
-                    )
-                }
-                is PaperDetailsUiState.Error -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(state.message, color = MaterialTheme.colorScheme.error)
                     }
                 }
             }

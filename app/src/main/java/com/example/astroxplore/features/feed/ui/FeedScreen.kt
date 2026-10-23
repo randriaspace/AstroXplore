@@ -56,7 +56,7 @@ import com.example.astroxplore.features.feed.model.PaperModel
 import com.example.astroxplore.core.ui.animation.expressiveBounce
 import com.example.astroxplore.core.ui.components.AstroM3DockedLinearProgress
 import com.example.astroxplore.core.ui.components.OfflineFallbackState
-import com.example.astroxplore.features.feed.ui.components.CosmicConstellationFeedLoader
+import com.example.astroxplore.features.feed.ui.components.FeedLoadingSkeletonList
 import com.example.astroxplore.features.feed.ui.components.PaperCard
 import com.example.astroxplore.features.feed.ui.components.PaperCardSkeleton
 import com.example.astroxplore.features.groups.ui.components.GroupPickerSheet
@@ -145,24 +145,33 @@ fun FeedScreen(
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
                     tonalElevation = 2.dp
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        AnimatedVisibility(
-                            visible = isHeaderVisible.value,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 840.dp)
                         ) {
-                            BrandingRow(
-                                profile = userProfile,
-                                onNotifClick = {},
-                                onProfileClick = onProfileClick
+                            AnimatedVisibility(
+                                visible = isHeaderVisible.value,
+                                enter = expandVertically() + fadeIn(),
+                                exit = shrinkVertically() + fadeOut()
+                            ) {
+                                BrandingRow(
+                                    profile = userProfile,
+                                    onNotifClick = {},
+                                    onProfileClick = onProfileClick
+                                )
+                            }
+
+                            QuickFilterTabs(
+                                tabs = filterTabs,
+                                selectedTab = selectedCategory,
+                                onTabSelected = { viewModel.selectCategory(it) }
                             )
                         }
-
-                        QuickFilterTabs(
-                            tabs = filterTabs,
-                            selectedTab = selectedCategory,
-                            onTabSelected = { viewModel.selectCategory(it) }
-                        )
                     }
                 }
             }
@@ -172,57 +181,62 @@ fun FeedScreen(
                 onRefresh = { viewModel.refresh() },
                 modifier = Modifier.fillMaxSize().padding(padding)
             ) {
-                LazyColumn(
-                    state = listState,
+                Box(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 16.dp)
+                    contentAlignment = Alignment.TopCenter
                 ) {
-                    item {
-                        SearchBar(
-                            onSearchClick = onSearchClick,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                        )
-                    }
-
-
-
-                    if (!isOnline && papers.isEmpty()) {
-                        item { OfflineFeedState(onLibraryClick = onLibraryClick) }
-                    } else if ((isRefreshing || isInitialLoading) && papers.isEmpty()) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .widthIn(max = 840.dp),
+                        contentPadding = PaddingValues(bottom = 16.dp)
+                    ) {
                         item {
-                            CosmicConstellationFeedLoader(
-                                modifier = Modifier.fillParentMaxSize()
+                            SearchBar(
+                                onSearchClick = onSearchClick,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
                             )
                         }
-                    } else if (error != null && papers.isEmpty()) {
-                        item {
-                            Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(text = stringResource(error!!), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+
+                        if (!isOnline && papers.isEmpty()) {
+                            item { OfflineFeedState(onLibraryClick = onLibraryClick) }
+                        } else if ((isRefreshing || isInitialLoading) && papers.isEmpty()) {
+                            item {
+                                FeedLoadingSkeletonList(
+                                    modifier = Modifier.fillParentMaxSize()
+                                )
                             }
-                        }
-                    } else if (!isRefreshing && !isInitialLoading && papers.isEmpty()) {
-                        item {
-                            EmptyResultsState(category = selectedCategory)
-                        }
-                    } else {
-                        items(papers, key = { it.bibcode }) { paper ->
-                            PaperCard(
-                                paper = paper,
-                                isSaved = savedPaperIds.contains(paper.bibcode),
-                                onSaveClick = { viewModel.toggleSavePaper(paper) },
-                                onTitleClick = { onPaperClick(paper.bibcode) },
-                                onReadMoreClick = { onPaperClick(paper.bibcode) },
-                                onMoreClick = {
-                                    selectedPaperForGroup = paper
-                                    showGroupPicker = true
+                        } else if (error != null && papers.isEmpty()) {
+                            item {
+                                Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text(text = stringResource(error!!), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                                 }
-                            )
-                        }
-                        
-                        if (isLoadingMore) {
-                            items(3) { PaperCardSkeleton() }
-                        } else if (papers.isNotEmpty()) {
-                            item { EndOfFeedMessage() }
+                            }
+                        } else if (!isRefreshing && !isInitialLoading && papers.isEmpty()) {
+                            item {
+                                EmptyResultsState(category = selectedCategory)
+                            }
+                        } else {
+                            items(papers, key = { it.bibcode }) { paper ->
+                                PaperCard(
+                                    paper = paper,
+                                    isSaved = savedPaperIds.contains(paper.bibcode),
+                                    onSaveClick = { viewModel.toggleSavePaper(paper) },
+                                    onTitleClick = { onPaperClick(paper.bibcode) },
+                                    onReadMoreClick = { onPaperClick(paper.bibcode) },
+                                    onMoreClick = {
+                                        selectedPaperForGroup = paper
+                                        showGroupPicker = true
+                                    }
+                                )
+                            }
+                            
+                            if (isLoadingMore) {
+                                items(3) { PaperCardSkeleton() }
+                            } else if (papers.isNotEmpty()) {
+                                item { EndOfFeedMessage() }
+                            }
                         }
                     }
                 }

@@ -628,7 +628,7 @@ fun SuccessImmersive(onComplete: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "Welcome to the Crew!",
+                text = "Welcome to AstroXplore",
                 style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimary,
